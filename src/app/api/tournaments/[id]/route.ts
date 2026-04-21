@@ -12,25 +12,78 @@ export async function GET(
 
     const tournament = await prisma.tournament.findUnique({
       where: { id },
-      include: {
-        discipline: true,
-        category: true,
+      select: {
+        id: true,
+        name: true,
+        format: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        discipline: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            gender: true,
+          },
+        },
         teams: {
-          include: {
+          select: {
+            id: true,
+            tournamentId: true,
+            teamId: true,
             team: {
-              include: {
+              select: {
+                id: true,
+                name: true,
+                establishmentId: true,
+                createdAt: true,
+                updatedAt: true,
                 establishment: true,
               },
             },
           },
         },
         matches: {
-          include: {
+          select: {
+            id: true,
+            tournamentId: true,
+            homeTeamId: true,
+            awayTeamId: true,
+            date: true,
+            location: true,
+            homeScore: true,
+            awayScore: true,
+            isFinished: true,
+            round: true,
+            groupName: true,
+            matchLogicIdentifier: true,
+            createdAt: true,
+            updatedAt: true,
             homeTeam: {
-              include: { establishment: true },
+              select: {
+                id: true,
+                name: true,
+                establishmentId: true,
+                createdAt: true,
+                updatedAt: true,
+                establishment: true,
+              },
             },
             awayTeam: {
-              include: { establishment: true },
+              select: {
+                id: true,
+                name: true,
+                establishmentId: true,
+                createdAt: true,
+                updatedAt: true,
+                establishment: true,
+              },
             },
           },
           orderBy: [{ round: "asc" }, { createdAt: "asc" }],

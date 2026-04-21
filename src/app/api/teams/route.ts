@@ -27,8 +27,19 @@ export async function GET(request: NextRequest) {
         ],
       },
       orderBy: { createdAt: "desc" },
-      include: {
-        establishment: true,
+      select: {
+        id: true,
+        name: true,
+        establishmentId: true,
+        createdAt: true,
+        updatedAt: true,
+        establishment: {
+          select: {
+            id: true,
+            name: true,
+            comuna: true,
+          },
+        },
       },
     });
 

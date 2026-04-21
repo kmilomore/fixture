@@ -17,9 +17,26 @@ export async function GET(request: NextRequest) {
           }
         : undefined,
       orderBy: { createdAt: "desc" },
-      include: {
-        discipline: true,
-        category: true,
+      select: {
+        id: true,
+        name: true,
+        format: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        discipline: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            gender: true,
+          },
+        },
         _count: {
           select: { teams: true, matches: true },
         },

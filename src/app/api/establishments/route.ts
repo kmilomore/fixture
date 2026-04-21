@@ -36,7 +36,12 @@ export async function GET(request: NextRequest) {
         ],
       },
       orderBy: { name: "asc" },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        comuna: true,
+        createdAt: true,
+        updatedAt: true,
         _count: {
           select: { teams: true },
         },

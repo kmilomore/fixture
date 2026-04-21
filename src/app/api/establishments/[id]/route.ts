@@ -12,7 +12,13 @@ export async function GET(
     const { id } = await params;
     const establishment = await prisma.establishment.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        comuna: true,
+        logoUrl: true,
+        createdAt: true,
+        updatedAt: true,
         _count: { select: { teams: true } },
       },
     });
