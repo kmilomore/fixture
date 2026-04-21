@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import postgres from "@/lib/postgres";
 
 export const dynamic = "force-dynamic";
 
@@ -8,50 +8,40 @@ export async function GET(request: NextRequest) {
     const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";
     const establishmentId = request.nextUrl.searchParams.get("establishmentId")?.trim() ?? "";
 
-    const teams = await prisma.team.findMany({
-      where: {
-        AND: [
-          query
-            ? {
-                OR: [
-                  { name: { contains: query, mode: "insensitive" } },
-                  {
-                    establishment: {
-                      name: { contains: query, mode: "insensitive" },
-                    },
-                  },
-                ],
-              }
-            : {},
-          establishmentId ? { establishmentId } : {},
-        ],
-      },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        name: true,
-        establishmentId: true,
-        createdAt: true,
-        updatedAt: true,
-        establishment: {
-          select: {
-            id: true,
-            name: true,
-            comuna: true,
-          },
-        },
-      },
-    });
+    const teams = await postgres.query<{
+      id: string;
+      name: string;
+      establishmentId: string;
+      createdAt: Date;
+      updatedAt: Date;
+      establishmentName: string;
+      establishmentComuna: string | null;
+    }>(
+      `SELECT
+        t."id",
+        t."name",
+        t."establishmentId",
+        t."createdAt",
+        t."updatedAt",
+        e."name" AS "establishmentName",
+        e."comuna" AS "establishmentComuna"
+      FROM public."Team" t
+      INNER JOIN public."Establishment" e ON e."id" = t."establishmentId"
+      WHERE ($1 = '' OR (t."name" ILIKE '%' || $1 || '%' OR e."name" ILIKE '%' || $1 || '%'))
+        AND ($2 = '' OR t."establishmentId" = $2)
+      ORDER BY t."createdAt" DESC`,
+      [query, establishmentId]
+    );
 
     return NextResponse.json(
-      teams.map((team) => ({
+      teams.rows.map((team) => ({
         id: team.id,
         name: team.name,
         establishmentId: team.establishmentId,
         establishment: {
-          id: team.establishment.id,
-          name: team.establishment.name,
-          comuna: team.establishment.comuna,
+          id: team.establishmentId,
+          name: team.establishmentName,
+          comuna: team.establishmentComuna,
         },
         createdAt: team.createdAt.toISOString(),
         updatedAt: team.updatedAt.toISOString(),
@@ -79,23 +69,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const team = await prisma.team.create({
-      data: { name, establishmentId },
-      include: { establishment: true },
-    });
+    const team = await postgres.query<{
+      id: string;
+      name: string;
+      establishmentId: string;
+      createdAt: Date;
+      updatedAt: Date;
+      establishmentName: string;
+      establishmentComuna: string | null;
+    }>(
+      `INSERT INTO public."Team" ("id", "name", "establishmentId")
+       VALUES ($1, $2, $3)
+       RETURNING "id", "name", "establishmentId", "createdAt", "updatedAt",
+         (SELECT e."name" FROM public."Establishment" e WHERE e."id" = $3) AS "establishmentName",
+         (SELECT e."comuna" FROM public."Establishment" e WHERE e."id" = $3) AS "establishmentComuna"`,
+      [crypto.randomUUID(), name, establishmentId]
+    );
+
+    const row = team.rows[0];
 
     return NextResponse.json(
       {
-        id: team.id,
-        name: team.name,
-        establishmentId: team.establishmentId,
+        id: row.id,
+        name: row.name,
+        establishmentId: row.establishmentId,
         establishment: {
-          id: team.establishment.id,
-          name: team.establishment.name,
-          comuna: team.establishment.comuna,
+          id: row.establishmentId,
+          name: row.establishmentName,
+          comuna: row.establishmentComuna,
         },
-        createdAt: team.createdAt.toISOString(),
-        updatedAt: team.updatedAt.toISOString(),
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
       },
       { status: 201 }
     );

@@ -1,13 +1,7 @@
 "use server";
 
-import prisma from "@/lib/prisma";
-import {
-  ensureTeamsMatchEstablishments,
-  getExistingEstablishmentNameSet,
-  normalizeComuna,
-  normalizeEstablishmentName,
-} from "@/lib/establishments";
 import { revalidatePath } from "next/cache";
+import { requestServerApi } from "@/lib/serverApi";
 
 export async function createEstablishment(formData: FormData) {
   const name = formData.get("name") as string;
@@ -19,26 +13,22 @@ export async function createEstablishment(formData: FormData) {
   }
 
   try {
-    const normalizedName = normalizeEstablishmentName(name);
-    const existingNames = await getExistingEstablishmentNameSet();
-
-    if (existingNames.has(normalizedName)) {
-      return { error: "El establecimiento ya existe" };
-    }
-
-    await prisma.establishment.create({
-      data: {
+    const response = await requestServerApi<{ id: string }>("/api/establishments", {
+      method: "POST",
+      body: JSON.stringify({
         name: name.trim(),
-        comuna: normalizeComuna(comuna),
-        logoUrl: logoUrl || null,
-      },
+        comuna,
+        logoUrl,
+      }),
     });
 
-    await ensureTeamsMatchEstablishments();
+    if (!response.ok) {
+      return { error: (response.body as { error?: string } | null)?.error ?? "Error al crear el establecimiento" };
+    }
 
     revalidatePath("/establishments");
     revalidatePath("/teams");
-    revalidatePath("/"); // revalidate dashboard
+    revalidatePath("/");
     return { success: true };
   } catch {
     return { error: "Error al crear el establecimiento" };
@@ -47,9 +37,14 @@ export async function createEstablishment(formData: FormData) {
 
 export async function deleteEstablishment(id: string) {
   try {
-    await prisma.establishment.delete({
-      where: { id },
+    const response = await requestServerApi<{ success: true }>(`/api/establishments/${id}`, {
+      method: "DELETE",
     });
+
+    if (!response.ok) {
+      return { error: (response.body as { error?: string } | null)?.error ?? "Error al eliminar (puede tener equipos asociados)" };
+    }
+
     revalidatePath("/establishments");
     revalidatePath("/teams");
     revalidatePath("/");

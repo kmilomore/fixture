@@ -1,7 +1,7 @@
 "use server";
 
-import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requestServerApi } from "@/lib/serverApi";
 
 export async function createTeam(formData: FormData) {
   const name = formData.get("name") as string;
@@ -12,24 +12,37 @@ export async function createTeam(formData: FormData) {
   }
 
   try {
-    await prisma.team.create({
-      data: { name, establishmentId },
+    const response = await requestServerApi<{ id: string }>("/api/teams", {
+      method: "POST",
+      body: JSON.stringify({ name, establishmentId }),
     });
+
+    if (!response.ok) {
+      return { error: (response.body as { error?: string } | null)?.error ?? "Error al crear el equipo." };
+    }
+
     revalidatePath("/teams");
-    revalidatePath("/establishments"); // updates count
+    revalidatePath("/establishments");
     return { success: true };
-  } catch (error) {
+  } catch {
     return { error: "Error al crear el equipo." };
   }
 }
 
 export async function deleteTeam(id: string) {
   try {
-    await prisma.team.delete({ where: { id } });
+    const response = await requestServerApi<{ success: true }>(`/api/teams/${id}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      return { error: (response.body as { error?: string } | null)?.error ?? "Error al eliminar el equipo." };
+    }
+
     revalidatePath("/teams");
     revalidatePath("/establishments");
     return { success: true };
-  } catch (error) {
+  } catch {
     return { error: "Error al eliminar el equipo." };
   }
 }

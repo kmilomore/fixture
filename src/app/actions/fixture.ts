@@ -1,15 +1,20 @@
 "use server";
 
-import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { generateFixtureMatches, type FixtureFormat, type FixtureGenerationOptions } from "@/lib/fixtureEngine";
+import { type FixtureFormat, type FixtureGenerationOptions } from "@/lib/fixtureEngine";
+import { requestServerApi } from "@/lib/serverApi";
 
 export async function setTournamentFormat(tournamentId: string, format: FixtureFormat) {
   try {
-    await prisma.tournament.update({
-      where: { id: tournamentId },
-      data: { format, status: "DRAFT" },
+    const response = await requestServerApi<{ id: string }>(`/api/tournaments/${tournamentId}/fixture/format`, {
+      method: "PUT",
+      body: JSON.stringify({ format }),
     });
+
+    if (!response.ok) {
+      return { error: (response.body as { error?: string } | null)?.error ?? "Error al guardar el formato" };
+    }
+
     revalidatePath(`/tournaments/${tournamentId}`);
     return { success: true };
   } catch {
@@ -22,46 +27,17 @@ export async function generateFixture(
   options: FixtureGenerationOptions
 ) {
   try {
-    const tournament = await prisma.tournament.findUnique({
-      where: { id: tournamentId },
-      include: {
-        teams: { include: { team: true } },
-        matches: true,
-      },
+    const response = await requestServerApi<{ success: true; count: number } | { error?: string }>(`/api/tournaments/${tournamentId}/fixture/generate`, {
+      method: "POST",
+      body: JSON.stringify(options),
     });
 
-    if (!tournament) return { error: "Torneo no encontrado" };
-    if (!options.format) return { error: "Debes seleccionar el formato primero" };
-    if (tournament.teams.length < 2) return { error: "Necesitas al menos 2 equipos para generar el fixture" };
-    if (tournament.matches.length > 0) return { error: "Este torneo ya tiene partidos generados" };
-
-    const teams = tournament.teams.map((tt) => ({
-      id: tt.team.id,
-      name: tt.team.name,
-    }));
-
-    const fixtureMatches = generateFixtureMatches(teams, options);
-
-    // Insertar todos los partidos de una vez
-    await prisma.match.createMany({
-      data: fixtureMatches.map((m) => ({
-        tournamentId,
-        homeTeamId: m.homeTeamId,
-        awayTeamId: m.awayTeamId,
-        round: m.round,
-        groupName: m.groupName,
-        matchLogicIdentifier: m.matchLogicIdentifier,
-        date: m.date ?? null,
-      })),
-    });
-
-    await prisma.tournament.update({
-      where: { id: tournamentId },
-      data: { status: "PLAYING", format: options.format },
-    });
+    if (!response.ok) {
+      return { error: (response.body as { error?: string } | null)?.error ?? "Error al generar el fixture" };
+    }
 
     revalidatePath(`/tournaments/${tournamentId}`);
-    return { success: true, count: fixtureMatches.length };
+    return { success: true, count: (response.body as { count: number }).count };
   } catch (e) {
     console.error(e);
     return { error: "Error al generar el fixture" };
@@ -70,11 +46,14 @@ export async function generateFixture(
 
 export async function resetFixture(tournamentId: string) {
   try {
-    await prisma.match.deleteMany({ where: { tournamentId } });
-    await prisma.tournament.update({
-      where: { id: tournamentId },
-      data: { status: "DRAFT", format: null },
+    const response = await requestServerApi<{ success: true }>(`/api/tournaments/${tournamentId}/fixture/reset`, {
+      method: "POST",
     });
+
+    if (!response.ok) {
+      return { error: (response.body as { error?: string } | null)?.error ?? "Error al reiniciar el fixture" };
+    }
+
     revalidatePath(`/tournaments/${tournamentId}`);
     return { success: true };
   } catch {
@@ -84,16 +63,21 @@ export async function resetFixture(tournamentId: string) {
 
 export async function updateMatchResult(matchId: string, homeScore: number, awayScore: number, location?: string, date?: string) {
   try {
-    await prisma.match.update({
-      where: { id: matchId },
-      data: {
+    const response = await requestServerApi<{ id: string }>(`/api/matches/${matchId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
         homeScore,
         awayScore,
         isFinished: true,
         location: location || null,
         date: date ? new Date(date) : null,
-      },
+      }),
     });
+
+    if (!response.ok) {
+      return { error: (response.body as { error?: string } | null)?.error ?? "Error al actualizar resultado" };
+    }
+
     revalidatePath("/tournaments");
     return { success: true };
   } catch {
@@ -104,19 +88,39 @@ export async function updateMatchResult(matchId: string, homeScore: number, away
 // Carga masiva de establecimientos desde CSV
 export async function bulkCreateEstablishments(rows: Array<{ name: string; comuna?: string | null }>) {
   try {
-    const {
-      dedupeEstablishmentRows,
-      ensureTeamsMatchEstablishments,
-      getExistingEstablishmentNameSet,
-      normalizeComuna,
-      normalizeEstablishmentName,
-    } = await import("@/lib/establishments");
-    const validRows = dedupeEstablishmentRows(
-      rows
-        .filter((row) => row.name && row.name.trim() !== "")
-        .map((row) => ({ name: row.name.trim(), comuna: normalizeComuna(row.comuna) }))
+    const normalizeComuna = (value?: string | null) => {
+      const normalized = typeof value === "string" ? value.trim() : "";
+      return normalized ? normalized : null;
+    };
+    const normalizeEstablishmentName = (value: string) =>
+      value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const validRows = Array.from(
+      new Map(
+        rows
+          .filter((row) => row.name && row.name.trim() !== "")
+          .map((row) => {
+            const name = row.name.trim();
+            return [normalizeEstablishmentName(name), { name, comuna: normalizeComuna(row.comuna) }] as const;
+          })
+      ).values()
     );
-    const existingNames = await getExistingEstablishmentNameSet();
+
+    const existingResponse = await requestServerApi<Array<{ name: string }>>("/api/establishments", {
+      method: "GET",
+    });
+
+    if (!existingResponse.ok || !existingResponse.body) {
+      return { error: "Error al consultar establecimientos existentes" };
+    }
+
+    const existingEstablishments = Array.isArray(existingResponse.body) ? existingResponse.body : [];
+    const existingNames = new Set(existingEstablishments.map((item: { name: string }) => normalizeEstablishmentName(item.name)));
     let count = 0;
 
     for (const row of validRows) {
@@ -125,20 +129,24 @@ export async function bulkCreateEstablishments(rows: Array<{ name: string; comun
       }
 
       try {
-        await prisma.establishment.create({
-          data: {
+        const createResponse = await requestServerApi<{ id: string } | { error?: string }>("/api/establishments", {
+          method: "POST",
+          body: JSON.stringify({
             name: row.name.trim(),
             comuna: normalizeComuna(row.comuna),
-          },
+          }),
         });
+
+        if (!createResponse.ok) {
+          continue;
+        }
+
         existingNames.add(normalizeEstablishmentName(row.name));
         count++;
       } catch {
         // Ignorar registros inválidos individuales y continuar con el resto.
       }
     }
-
-    await ensureTeamsMatchEstablishments();
 
     revalidatePath("/establishments");
     revalidatePath("/teams");

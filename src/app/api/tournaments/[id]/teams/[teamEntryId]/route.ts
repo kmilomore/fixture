@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import postgres from "@/lib/postgres";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,10 @@ export async function DELETE(
 ) {
   try {
     const { teamEntryId } = await params;
-    await prisma.tournamentTeam.delete({ where: { id: teamEntryId } });
+    const result = await postgres.query('DELETE FROM public."TournamentTeam" WHERE "id" = $1', [teamEntryId]);
+    if (result.rowCount === 0) {
+      return NextResponse.json({ error: "Inscripcion no encontrada" }, { status: 404 });
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/tournaments/[id]/teams/[teamEntryId] failed:", error);

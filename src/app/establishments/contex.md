@@ -90,8 +90,8 @@ Cada establecimiento puede:
   - Fuente base del directorio por defecto.
   - Se usa como catálogo integrado en la app.
 
-- `../../../prisma/schema.prisma`
-  - Define el modelo `Establishment`.
+- Esquema PostgreSQL del proyecto
+  - Define la estructura esperada para `Establishment`.
   - Actualmente se espera el campo `comuna` además de `name` y `logoUrl`.
 
 ## Modelo conceptual actual
@@ -264,16 +264,16 @@ El módulo se transformó en un punto de sincronización entre tres fuentes:
 
 Por eso cualquier cambio aquí impacta directamente la disponibilidad de equipos y la preparación de torneos.
 
-### Hallazgo 2: `comuna` requiere sincronización real de Prisma
+### Hallazgo 2: `comuna` requiere consistencia real entre API y base
 
 Se incorporó el campo `comuna` en el esquema funcional, pero apareció un desfase típico:
 
 - la UI y la lógica ya intentan usar `establishment.comuna`;
-- si el cliente Prisma o la base no están actualizados, TypeScript y Prisma quedan fuera de sincronía.
+- si la API o la base no están alineadas, el frontend queda fuera de sincronía con los datos reales.
 
 Consecuencia práctica:
 
-- hay que ejecutar la actualización de Prisma antes de considerar estable este cambio.
+- hay que mantener la API y el esquema de PostgreSQL alineados antes de considerar estable este cambio.
 
 ### Hallazgo 3: la sincronización automática debe ser idempotente
 
@@ -299,12 +299,12 @@ Esto debe tratarse como una decisión funcional, no solo técnica.
 
 ### Pendiente crítico
 
-Actualizar Prisma para que `comuna` exista efectivamente en el cliente generado y en la base local.
+Mantener alineados el esquema de PostgreSQL y los endpoints que exponen `comuna`.
 
 Pendientes esperables:
 
-1. aplicar migración o sincronización de esquema;
-2. regenerar cliente Prisma;
+1. aplicar ajuste de esquema si el hosting no refleja la columna esperada;
+2. validar endpoints de establecimientos y exportación;
 3. volver a ejecutar build.
 
 ### Pendiente funcional
@@ -334,9 +334,9 @@ El módulo de establecimientos afecta directamente:
 - `tournaments`: porque depende de que existan equipos para inscribir.
 - `dashboard`: porque revalida conteos al crear o borrar.
 
-## Estado esperado del módulo después de estabilizar Prisma
+## Estado esperado del módulo después de estabilizar la capa de datos
 
-Cuando el ajuste de Prisma esté completo, el comportamiento objetivo de la carpeta debe ser:
+Cuando el ajuste de la API y la base esté completo, el comportamiento objetivo de la carpeta debe ser:
 
 1. el directorio base siempre está disponible en la app;
 2. el usuario puede agregar más establecimientos locales;

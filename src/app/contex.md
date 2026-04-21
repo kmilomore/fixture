@@ -48,8 +48,8 @@ Esto significa que el módulo raíz actúa como punto de entrada operativo para 
 
 ## Nota arquitectónica actual
 
-- La app mantiene Prisma como capa interna de acceso a datos del servidor.
-- La exposición pública para frontend o integraciones ahora debe apoyarse en rutas `src/app/api/**`.
+- La app usa PostgreSQL nativo vía `pg` como capa interna de acceso a datos del servidor.
+- La exposición para frontend o integraciones se apoya en rutas `src/app/api/**` y helpers HTTP del servidor.
 
 ## Hallazgos
 

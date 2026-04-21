@@ -25,7 +25,7 @@ Además, el usuario puede seguir agregando más disciplinas y categorías manual
 ## Archivos clave
 
 - `page.tsx`
-  - Consulta disciplinas y categorías desde Prisma.
+  - Consulta disciplinas y categorías desde endpoints internos.
   - Renderiza dos paneles independientes.
 
 - `Forms.tsx`

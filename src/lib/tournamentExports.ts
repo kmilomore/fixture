@@ -1,4 +1,4 @@
-import prisma from "@/lib/prisma";
+import postgres from "@/lib/postgres";
 
 type ExportMatch = {
   id: string;
@@ -77,29 +77,64 @@ export function buildTournamentExportFileName(name: string, extension: "pdf" | "
 }
 
 export async function getTournamentFixtureExportData(tournamentId: string): Promise<TournamentFixtureExportData | null> {
-  const tournament = await prisma.tournament.findUnique({
-    where: { id: tournamentId },
-    include: {
-      discipline: true,
-      category: true,
-      teams: true,
-      matches: {
-        include: {
-          homeTeam: true,
-          awayTeam: true,
-        },
-        orderBy: [{ round: "asc" }, { createdAt: "asc" }],
-      },
-    },
-  });
+  const [tournamentResult, matchesResult] = await Promise.all([
+    postgres.query<{
+      id: string;
+      name: string;
+      disciplineName: string;
+      categoryName: string;
+      categoryGender: string;
+      format: string | null;
+      status: string;
+      teamsCount: number;
+    }>(
+      `SELECT t."id", t."name", t."format", t."status",
+         d."name" AS "disciplineName",
+         c."name" AS "categoryName",
+         c."gender" AS "categoryGender",
+         COUNT(DISTINCT tt."id")::int AS "teamsCount"
+       FROM public."Tournament" t
+       INNER JOIN public."Discipline" d ON d."id" = t."disciplineId"
+       INNER JOIN public."Category" c ON c."id" = t."categoryId"
+       LEFT JOIN public."TournamentTeam" tt ON tt."tournamentId" = t."id"
+       WHERE t."id" = $1
+       GROUP BY t."id", d."id", c."id"`,
+      [tournamentId]
+    ),
+    postgres.query<{
+      id: string;
+      round: number | null;
+      groupName: string | null;
+      matchLogicIdentifier: string | null;
+      date: Date | null;
+      location: string | null;
+      homeScore: number | null;
+      awayScore: number | null;
+      isFinished: boolean;
+      homeTeamName: string | null;
+      awayTeamName: string | null;
+    }>(
+      `SELECT m."id", m."round", m."groupName", m."matchLogicIdentifier", m."date", m."location", m."homeScore", m."awayScore", m."isFinished",
+         ht."name" AS "homeTeamName",
+         at."name" AS "awayTeamName"
+       FROM public."Match" m
+       LEFT JOIN public."Team" ht ON ht."id" = m."homeTeamId"
+       LEFT JOIN public."Team" at ON at."id" = m."awayTeamId"
+       WHERE m."tournamentId" = $1
+       ORDER BY m."round" ASC NULLS LAST, m."createdAt" ASC`,
+      [tournamentId]
+    ),
+  ]);
 
-  if (!tournament) {
+  if (tournamentResult.rowCount === 0) {
     return null;
   }
 
+  const tournament = tournamentResult.rows[0];
+
   const groupsMap = new Map<string, ExportMatch[]>();
 
-  for (const match of tournament.matches) {
+  for (const match of matchesResult.rows) {
     const groupTitle = getGroupTitle(match);
     const groupMatches = groupsMap.get(groupTitle) ?? [];
     const placeholderSides = getPlaceholderSides(match.matchLogicIdentifier);
@@ -107,8 +142,8 @@ export async function getTournamentFixtureExportData(tournamentId: string): Prom
     groupMatches.push({
       id: match.id,
       phaseLabel: getPhaseLabel(match.matchLogicIdentifier),
-      homeTeam: match.homeTeam?.name ?? placeholderSides?.home ?? "BYE",
-      awayTeam: match.awayTeam?.name ?? placeholderSides?.away ?? "BYE",
+      homeTeam: match.homeTeamName ?? placeholderSides?.home ?? "BYE",
+      awayTeam: match.awayTeamName ?? placeholderSides?.away ?? "BYE",
       score: match.isFinished ? `${match.homeScore ?? 0} - ${match.awayScore ?? 0}` : "Pendiente",
       location: match.location ?? "Por definir",
       dateLabel: formatDateLabel(match.date),
@@ -121,12 +156,12 @@ export async function getTournamentFixtureExportData(tournamentId: string): Prom
   return {
     id: tournament.id,
     name: tournament.name,
-    discipline: tournament.discipline.name,
-    category: `${tournament.category.name} (${tournament.category.gender})`,
+    discipline: tournament.disciplineName,
+    category: `${tournament.categoryName} (${tournament.categoryGender})`,
     format: tournament.format ?? "Sin definir",
     status: tournament.status,
-    teamsCount: tournament.teams.length,
-    matchesCount: tournament.matches.length,
+    teamsCount: tournament.teamsCount,
+    matchesCount: matchesResult.rowCount ?? 0,
     groups: Array.from(groupsMap.entries()).map(([title, matches]) => ({ title, matches })),
   };
 }

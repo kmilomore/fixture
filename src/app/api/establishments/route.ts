@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import {
-  ensureTeamsMatchEstablishments,
-  getExistingEstablishmentNameSet,
-  normalizeComuna,
-  normalizeEstablishmentName,
-} from "@/lib/establishments";
+import postgres from "@/lib/postgres";
+import { normalizeComuna, normalizeEstablishmentName } from "@/lib/establishments";
 
 export const dynamic = "force-dynamic";
 
@@ -14,46 +9,36 @@ export async function GET(request: NextRequest) {
     const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";
     const comuna = request.nextUrl.searchParams.get("comuna")?.trim() ?? "";
 
-    const establishments = await prisma.establishment.findMany({
-      where: {
-        AND: [
-          query
-            ? {
-                name: {
-                  contains: query,
-                  mode: "insensitive",
-                },
-              }
-            : {},
-          comuna
-            ? {
-                comuna: {
-                  equals: comuna,
-                  mode: "insensitive",
-                },
-              }
-            : {},
-        ],
-      },
-      orderBy: { name: "asc" },
-      select: {
-        id: true,
-        name: true,
-        comuna: true,
-        createdAt: true,
-        updatedAt: true,
-        _count: {
-          select: { teams: true },
-        },
-      },
-    });
+    const establishments = await postgres.query<{
+      id: string;
+      name: string;
+      comuna: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+      teamsCount: number;
+    }>(
+      `SELECT
+        e."id",
+        e."name",
+        e."comuna",
+        e."createdAt",
+        e."updatedAt",
+        COUNT(t."id")::int AS "teamsCount"
+      FROM public."Establishment" e
+      LEFT JOIN public."Team" t ON t."establishmentId" = e."id"
+      WHERE ($1 = '' OR e."name" ILIKE '%' || $1 || '%')
+        AND ($2 = '' OR COALESCE(e."comuna", '') ILIKE $2)
+      GROUP BY e."id", e."name", e."comuna", e."createdAt", e."updatedAt"
+      ORDER BY e."name" ASC`,
+      [query, comuna]
+    );
 
     return NextResponse.json(
-      establishments.map((establishment) => ({
+      establishments.rows.map((establishment) => ({
         id: establishment.id,
         name: establishment.name,
         comuna: establishment.comuna,
-        teamsCount: establishment._count.teams,
+        teamsCount: establishment.teamsCount,
         createdAt: establishment.createdAt.toISOString(),
         updatedAt: establishment.updatedAt.toISOString(),
       }))
@@ -78,29 +63,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "El nombre es requerido" }, { status: 400 });
     }
 
-    const existingNames = await getExistingEstablishmentNameSet();
-    if (existingNames.has(normalizeEstablishmentName(name))) {
+    const existing = await postgres.query<{ name: string }>('SELECT "name" FROM public."Establishment"');
+    if (existing.rows.some((row) => normalizeEstablishmentName(row.name) === normalizeEstablishmentName(name))) {
       return NextResponse.json({ error: "El establecimiento ya existe" }, { status: 409 });
     }
 
-    const establishment = await prisma.establishment.create({
-      data: {
-        name,
-        comuna,
-        logoUrl,
-      },
-    });
+    const establishmentId = crypto.randomUUID();
+    const establishment = await postgres.query<{
+      id: string;
+      name: string;
+      comuna: string | null;
+      logoUrl: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+    }>(
+      'INSERT INTO public."Establishment" ("id", "name", "comuna", "logoUrl") VALUES ($1, $2, $3, $4) RETURNING "id", "name", "comuna", "logoUrl", "createdAt", "updatedAt"',
+      [establishmentId, name, comuna, logoUrl]
+    );
+    await postgres.query(
+      'INSERT INTO public."Team" ("id", "name", "establishmentId") VALUES ($1, $2, $3)',
+      [crypto.randomUUID(), name, establishmentId]
+    );
 
-    await ensureTeamsMatchEstablishments();
-
+    const row = establishment.rows[0];
     return NextResponse.json(
       {
-        id: establishment.id,
-        name: establishment.name,
-        comuna: establishment.comuna,
-        logoUrl: establishment.logoUrl,
-        createdAt: establishment.createdAt.toISOString(),
-        updatedAt: establishment.updatedAt.toISOString(),
+        id: row.id,
+        name: row.name,
+        comuna: row.comuna,
+        logoUrl: row.logoUrl,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
       },
       { status: 201 }
     );

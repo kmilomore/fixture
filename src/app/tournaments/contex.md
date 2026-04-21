@@ -140,4 +140,4 @@ Acciones relacionadas desde el motor de fixture:
 - El texto visible del selector debe priorizar el nombre de la escuela para que la selección sea más intuitiva.
 - El comportamiento correcto de esta sección depende de mantener el selector como componente controlado.
 - El módulo ya no solo crea torneos: ahora también resuelve la calendarización operativa del fixture.
-- La API HTTP permite desacoplar frontend, automatizaciones o clientes externos del acceso directo a Prisma.
+- La API HTTP permite desacoplar frontend, automatizaciones o clientes externos del acceso directo a PostgreSQL.

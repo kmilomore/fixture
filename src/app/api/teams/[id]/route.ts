@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import postgres from "@/lib/postgres";
 
 export const dynamic = "force-dynamic";
 
@@ -9,39 +9,40 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const team = await prisma.team.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        establishmentId: true,
-        createdAt: true,
-        updatedAt: true,
-        establishment: {
-          select: {
-            id: true,
-            name: true,
-            comuna: true,
-          },
-        },
-      },
-    });
+    const team = await postgres.query<{
+      id: string;
+      name: string;
+      establishmentId: string;
+      createdAt: Date;
+      updatedAt: Date;
+      establishmentName: string;
+      establishmentComuna: string | null;
+    }>(
+      `SELECT
+        t."id", t."name", t."establishmentId", t."createdAt", t."updatedAt",
+        e."name" AS "establishmentName", e."comuna" AS "establishmentComuna"
+      FROM public."Team" t
+      INNER JOIN public."Establishment" e ON e."id" = t."establishmentId"
+      WHERE t."id" = $1`,
+      [id]
+    );
 
-    if (!team) {
+    if (team.rowCount === 0) {
       return NextResponse.json({ error: "Equipo no encontrado" }, { status: 404 });
     }
 
+    const row = team.rows[0];
     return NextResponse.json({
-      id: team.id,
-      name: team.name,
-      establishmentId: team.establishmentId,
+      id: row.id,
+      name: row.name,
+      establishmentId: row.establishmentId,
       establishment: {
-        id: team.establishment.id,
-        name: team.establishment.name,
-        comuna: team.establishment.comuna,
+        id: row.establishmentId,
+        name: row.establishmentName,
+        comuna: row.establishmentComuna,
       },
-      createdAt: team.createdAt.toISOString(),
-      updatedAt: team.updatedAt.toISOString(),
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
     });
   } catch (error) {
     console.error("GET /api/teams/[id] failed:", error);
@@ -59,29 +60,45 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const team = await prisma.team.update({
-      where: { id },
-      data: {
-        name: typeof body.name === "string" && body.name.trim() ? body.name.trim() : undefined,
-        establishmentId:
-          typeof body.establishmentId === "string" && body.establishmentId.trim()
-            ? body.establishmentId.trim()
-            : undefined,
-      },
-      include: { establishment: true },
-    });
+    const name = typeof body.name === "string" && body.name.trim() ? body.name.trim() : null;
+    const establishmentId = typeof body.establishmentId === "string" && body.establishmentId.trim()
+      ? body.establishmentId.trim()
+      : null;
+    const team = await postgres.query<{
+      id: string;
+      name: string;
+      establishmentId: string;
+      createdAt: Date;
+      updatedAt: Date;
+      establishmentName: string;
+      establishmentComuna: string | null;
+    }>(
+      `UPDATE public."Team"
+       SET "name" = COALESCE($2, "name"),
+           "establishmentId" = COALESCE($3, "establishmentId")
+       WHERE "id" = $1
+       RETURNING "id", "name", "establishmentId", "createdAt", "updatedAt",
+         (SELECT e."name" FROM public."Establishment" e WHERE e."id" = public."Team"."establishmentId") AS "establishmentName",
+         (SELECT e."comuna" FROM public."Establishment" e WHERE e."id" = public."Team"."establishmentId") AS "establishmentComuna"`,
+      [id, name, establishmentId]
+    );
 
+    if (team.rowCount === 0) {
+      return NextResponse.json({ error: "Equipo no encontrado" }, { status: 404 });
+    }
+
+    const row = team.rows[0];
     return NextResponse.json({
-      id: team.id,
-      name: team.name,
-      establishmentId: team.establishmentId,
+      id: row.id,
+      name: row.name,
+      establishmentId: row.establishmentId,
       establishment: {
-        id: team.establishment.id,
-        name: team.establishment.name,
-        comuna: team.establishment.comuna,
+        id: row.establishmentId,
+        name: row.establishmentName,
+        comuna: row.establishmentComuna,
       },
-      createdAt: team.createdAt.toISOString(),
-      updatedAt: team.updatedAt.toISOString(),
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
     });
   } catch (error) {
     console.error("PATCH /api/teams/[id] failed:", error);
@@ -98,7 +115,10 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    await prisma.team.delete({ where: { id } });
+    const result = await postgres.query('DELETE FROM public."Team" WHERE "id" = $1', [id]);
+    if (result.rowCount === 0) {
+      return NextResponse.json({ error: "Equipo no encontrado" }, { status: 404 });
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/teams/[id] failed:", error);

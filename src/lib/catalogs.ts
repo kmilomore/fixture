@@ -1,4 +1,4 @@
-import prisma from "@/lib/prisma";
+import postgres from "@/lib/postgres";
 
 const DEFAULT_DISCIPLINES = [
   "Fútbol",
@@ -35,15 +35,19 @@ function buildCategoryKey(name: string, gender: string) {
 
 async function runCatalogsSync() {
   const [disciplines, categories] = await Promise.all([
-    prisma.discipline.findMany({ select: { id: true, name: true } }),
-    prisma.category.findMany({ select: { id: true, name: true, gender: true } }),
+    postgres.query<{ id: string; name: string }>(
+      'SELECT "id", "name" FROM public."Discipline"'
+    ),
+    postgres.query<{ id: string; name: string; gender: string }>(
+      'SELECT "id", "name", "gender" FROM public."Category"'
+    ),
   ]);
 
   const existingDisciplineNames = new Set(
-    disciplines.map((discipline) => normalizeCatalogName(discipline.name))
+    disciplines.rows.map((discipline) => normalizeCatalogName(discipline.name))
   );
   const existingCategoryKeys = new Set(
-    categories.map((category) => buildCategoryKey(category.name, category.gender))
+    categories.rows.map((category) => buildCategoryKey(category.name, category.gender))
   );
 
   const missingDisciplines = DEFAULT_DISCIPLINES.filter(
@@ -54,15 +58,21 @@ async function runCatalogsSync() {
   );
 
   if (missingDisciplines.length > 0) {
-    await prisma.discipline.createMany({
-      data: missingDisciplines.map((name) => ({ name })),
-    });
+    for (const name of missingDisciplines) {
+      await postgres.query(
+        'INSERT INTO public."Discipline" ("id", "name") VALUES ($1, $2)',
+        [crypto.randomUUID(), name]
+      );
+    }
   }
 
   if (missingCategories.length > 0) {
-    await prisma.category.createMany({
-      data: missingCategories,
-    });
+    for (const category of missingCategories) {
+      await postgres.query(
+        'INSERT INTO public."Category" ("id", "name", "gender") VALUES ($1, $2, $3)',
+        [crypto.randomUUID(), category.name, category.gender]
+      );
+    }
   }
 }
 

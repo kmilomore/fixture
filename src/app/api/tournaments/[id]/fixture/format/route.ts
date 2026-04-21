@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import postgres from "@/lib/postgres";
 import type { FixtureFormat } from "@/lib/fixtureEngine";
 
 export const dynamic = "force-dynamic";
@@ -17,15 +17,19 @@ export async function PUT(
       return NextResponse.json({ error: "El formato es requerido" }, { status: 400 });
     }
 
-    const tournament = await prisma.tournament.update({
-      where: { id },
-      data: { format, status: "DRAFT" },
-    });
+    const tournament = await postgres.query<{ id: string; format: string | null; status: string }>(
+      'UPDATE public."Tournament" SET "format" = $2, "status" = $3 WHERE "id" = $1 RETURNING "id", "format", "status"',
+      [id, format, "DRAFT"]
+    );
+
+    if (tournament.rowCount === 0) {
+      return NextResponse.json({ error: "Torneo no encontrado" }, { status: 404 });
+    }
 
     return NextResponse.json({
-      id: tournament.id,
-      format: tournament.format,
-      status: tournament.status,
+      id: tournament.rows[0].id,
+      format: tournament.rows[0].format,
+      status: tournament.rows[0].status,
     });
   } catch (error) {
     console.error("PUT /api/tournaments/[id]/fixture/format failed:", error);

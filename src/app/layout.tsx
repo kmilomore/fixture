@@ -19,11 +19,16 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  try {
-    await ensureDefaultCatalogsLoaded();
-    await ensureDefaultEstablishmentsLoaded();
-  } catch (error) {
-    console.error("Startup sync failed:", error);
+  const shouldRunStartupSync =
+    process.env.ENABLE_STARTUP_SYNC === "true" || process.env.NODE_ENV !== "production";
+
+  if (shouldRunStartupSync) {
+    try {
+      await ensureDefaultCatalogsLoaded();
+      await ensureDefaultEstablishmentsLoaded();
+    } catch (error) {
+      console.error("Startup sync failed:", error);
+    }
   }
 
   return (

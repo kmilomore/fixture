@@ -36,3 +36,29 @@ export async function fetchServerApi<T>(path: string, init?: RequestInit): Promi
 
   return response.json() as Promise<T>;
 }
+
+export async function requestServerApi<T>(path: string, init?: RequestInit) {
+  const baseUrl = await getServerApiBaseUrl();
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  let body: T | { error?: string } | null = null;
+
+  try {
+    body = (await response.json()) as T | { error?: string };
+  } catch {
+    body = null;
+  }
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    body,
+  };
+}

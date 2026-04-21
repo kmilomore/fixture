@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import postgres from "@/lib/postgres";
 
 export const dynamic = "force-dynamic";
 
@@ -9,17 +9,21 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const discipline = await prisma.discipline.findUnique({ where: { id } });
+    const discipline = await postgres.query<{ id: string; name: string; createdAt: Date; updatedAt: Date }>(
+      'SELECT "id", "name", "createdAt", "updatedAt" FROM public."Discipline" WHERE "id" = $1',
+      [id]
+    );
 
-    if (!discipline) {
+    if (discipline.rowCount === 0) {
       return NextResponse.json({ error: "Disciplina no encontrada" }, { status: 404 });
     }
 
+    const row = discipline.rows[0];
     return NextResponse.json({
-      id: discipline.id,
-      name: discipline.name,
-      createdAt: discipline.createdAt.toISOString(),
-      updatedAt: discipline.updatedAt.toISOString(),
+      id: row.id,
+      name: row.name,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
     });
   } catch (error) {
     console.error("GET /api/disciplines/[id] failed:", error);
@@ -37,18 +41,22 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const discipline = await prisma.discipline.update({
-      where: { id },
-      data: {
-        name: typeof body.name === "string" && body.name.trim() ? body.name.trim() : undefined,
-      },
-    });
+    const name = typeof body.name === "string" && body.name.trim() ? body.name.trim() : null;
+    const discipline = await postgres.query<{ id: string; name: string; createdAt: Date; updatedAt: Date }>(
+      'UPDATE public."Discipline" SET "name" = COALESCE($2, "name") WHERE "id" = $1 RETURNING "id", "name", "createdAt", "updatedAt"',
+      [id, name]
+    );
 
+    if (discipline.rowCount === 0) {
+      return NextResponse.json({ error: "Disciplina no encontrada" }, { status: 404 });
+    }
+
+    const row = discipline.rows[0];
     return NextResponse.json({
-      id: discipline.id,
-      name: discipline.name,
-      createdAt: discipline.createdAt.toISOString(),
-      updatedAt: discipline.updatedAt.toISOString(),
+      id: row.id,
+      name: row.name,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
     });
   } catch (error) {
     console.error("PATCH /api/disciplines/[id] failed:", error);
@@ -65,7 +73,10 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    await prisma.discipline.delete({ where: { id } });
+    const result = await postgres.query('DELETE FROM public."Discipline" WHERE "id" = $1', [id]);
+    if (result.rowCount === 0) {
+      return NextResponse.json({ error: "Disciplina no encontrada" }, { status: 404 });
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/disciplines/[id] failed:", error);

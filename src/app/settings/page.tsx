@@ -16,7 +16,7 @@ export default function SettingsPage() {
         <div className="text-sm text-slate-600 space-y-1">
           <p><span className="font-medium">Versión:</span> 1.0.0</p>
           <p><span className="font-medium">Base de datos:</span> PostgreSQL alojado</p>
-          <p><span className="font-medium">Infraestructura:</span> Next.js + Prisma + Vercel</p>
+          <p><span className="font-medium">Infraestructura:</span> Next.js + PostgreSQL + Vercel</p>
           <p><span className="font-medium">Motor de fixtures:</span> Liga, grupos y eliminatoria</p>
         </div>
       </div>

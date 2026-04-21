@@ -1,25 +1,32 @@
 import Papa from "papaparse";
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import postgres from "@/lib/postgres";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const establishments = await prisma.establishment.findMany({
-    orderBy: { name: "asc" },
-    include: {
-      _count: {
-        select: { teams: true },
-      },
-    },
-  });
+  const establishments = await postgres.query<{
+    id: string;
+    name: string;
+    comuna: string | null;
+    teamsCount: number;
+    createdAt: Date;
+    updatedAt: Date;
+  }>(
+    `SELECT e."id", e."name", e."comuna", e."createdAt", e."updatedAt",
+       COUNT(t."id")::int AS "teamsCount"
+     FROM public."Establishment" e
+     LEFT JOIN public."Team" t ON t."establishmentId" = e."id"
+     GROUP BY e."id"
+     ORDER BY e."name" ASC`
+  );
 
   const csv = Papa.unparse(
-    establishments.map((establishment) => ({
+    establishments.rows.map((establishment) => ({
       id: establishment.id,
       nombre: establishment.name,
       comuna: establishment.comuna ?? "",
-      equipos: establishment._count.teams,
+      equipos: establishment.teamsCount,
       creado_en: establishment.createdAt.toISOString(),
       actualizado_en: establishment.updatedAt.toISOString(),
     }))

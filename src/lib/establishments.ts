@@ -1,7 +1,8 @@
 import { promises as fs } from "fs";
 import path from "path";
+import type { PoolClient } from "pg";
 import Papa from "papaparse";
-import prisma from "@/lib/prisma";
+import postgres from "@/lib/postgres";
 
 const DEFAULT_ESTABLISHMENTS_CSV = "formacion_directorio_territorio.csv";
 
@@ -11,23 +12,31 @@ type EstablishmentImportRow = {
   comuna: string | null;
 };
 
-type SqliteColumnInfo = {
-  cid: number;
+type EstablishmentRow = {
+  id: string;
   name: string;
-  type: string;
-  notnull: number;
-  dflt_value: string | null;
-  pk: number;
+  comuna: string | null;
+  createdAt: Date;
+};
+
+type TeamRow = {
+  id: string;
+  name: string;
+  establishmentId: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type TournamentTeamRow = {
+  id: string;
+  tournamentId: string;
+  teamId: string;
 };
 
 declare global {
   var establishmentSyncPromise:
     | Promise<void>
     | undefined;
-}
-
-function isSqliteDatabase() {
-  return process.env.DATABASE_URL?.startsWith("file:") ?? false;
 }
 
 export function normalizeEstablishmentName(value: string) {
@@ -136,119 +145,139 @@ async function loadDefaultEstablishments() {
 }
 
 async function ensureEstablishmentSchema() {
-  if (!isSqliteDatabase()) {
-    return;
-  }
+  return;
+}
 
-  const columns = await prisma.$queryRawUnsafe<SqliteColumnInfo[]>(
-    'PRAGMA table_info("Establishment")'
+async function mergeTournamentTeams(
+  client: PoolClient,
+  duplicateTeamId: string,
+  canonicalTeamId: string
+) {
+  const duplicateTournamentTeams = await client.query<TournamentTeamRow>(
+    'SELECT "id", "tournamentId", "teamId" FROM public."TournamentTeam" WHERE "teamId" = $1',
+    [duplicateTeamId]
   );
 
-  const hasComuna = columns.some((column) => column.name === "comuna");
+  for (const tournamentTeam of duplicateTournamentTeams.rows) {
+    const existing = await client.query<{ id: string }>(
+      'SELECT "id" FROM public."TournamentTeam" WHERE "tournamentId" = $1 AND "teamId" = $2 LIMIT 1',
+      [tournamentTeam.tournamentId, canonicalTeamId]
+    );
 
-  if (!hasComuna) {
-    await prisma.$executeRawUnsafe(
-      'ALTER TABLE "Establishment" ADD COLUMN "comuna" TEXT'
+    if (existing.rows.length > 0) {
+      await client.query('DELETE FROM public."TournamentTeam" WHERE "id" = $1', [tournamentTeam.id]);
+      continue;
+    }
+
+    await client.query(
+      'UPDATE public."TournamentTeam" SET "teamId" = $2 WHERE "id" = $1',
+      [tournamentTeam.id, canonicalTeamId]
     );
   }
 }
 
-async function mergeTournamentTeams(duplicateTeamId: string, canonicalTeamId: string) {
-  const duplicateTournamentTeams = await prisma.tournamentTeam.findMany({
-    where: { teamId: duplicateTeamId },
-  });
-
-  for (const tournamentTeam of duplicateTournamentTeams) {
-    const existing = await prisma.tournamentTeam.findFirst({
-      where: {
-        tournamentId: tournamentTeam.tournamentId,
-        teamId: canonicalTeamId,
-      },
-      select: { id: true },
-    });
-
-    if (existing) {
-      await prisma.tournamentTeam.delete({ where: { id: tournamentTeam.id } });
-      continue;
-    }
-
-    await prisma.tournamentTeam.update({
-      where: { id: tournamentTeam.id },
-      data: { teamId: canonicalTeamId },
-    });
-  }
-}
-
-async function mergeTeamIntoCanonical(duplicateTeamId: string, canonicalTeamId: string) {
+async function mergeTeamIntoCanonical(
+  client: PoolClient,
+  duplicateTeamId: string,
+  canonicalTeamId: string
+) {
   if (duplicateTeamId === canonicalTeamId) {
     return;
   }
 
-  await mergeTournamentTeams(duplicateTeamId, canonicalTeamId);
-  await prisma.match.updateMany({
-    where: { homeTeamId: duplicateTeamId },
-    data: { homeTeamId: canonicalTeamId },
-  });
-  await prisma.match.updateMany({
-    where: { awayTeamId: duplicateTeamId },
-    data: { awayTeamId: canonicalTeamId },
-  });
-  await prisma.team.delete({ where: { id: duplicateTeamId } });
+  await mergeTournamentTeams(client, duplicateTeamId, canonicalTeamId);
+  await client.query(
+    'UPDATE public."Match" SET "homeTeamId" = $2 WHERE "homeTeamId" = $1',
+    [duplicateTeamId, canonicalTeamId]
+  );
+  await client.query(
+    'UPDATE public."Match" SET "awayTeamId" = $2 WHERE "awayTeamId" = $1',
+    [duplicateTeamId, canonicalTeamId]
+  );
+  await client.query('DELETE FROM public."Team" WHERE "id" = $1', [duplicateTeamId]);
 }
 
 export async function mergeDuplicateEstablishments() {
-  const establishments = await prisma.establishment.findMany({
-    orderBy: { createdAt: "asc" },
-    include: {
-      teams: {
-        orderBy: { createdAt: "asc" },
-      },
-    },
-  });
+  const client = await postgres.connect();
 
-  const groups = new Map<string, typeof establishments>();
+  try {
+    await client.query("BEGIN");
 
-  for (const establishment of establishments) {
-    const normalizedName = normalizeEstablishmentName(establishment.name);
-    const group = groups.get(normalizedName) ?? [];
-    group.push(establishment);
-    groups.set(normalizedName, group);
-  }
+    const [establishmentsResult, teamsResult] = await Promise.all([
+      client.query<EstablishmentRow>(
+        'SELECT "id", "name", "comuna", "createdAt" FROM public."Establishment" ORDER BY "createdAt" ASC'
+      ),
+      client.query<TeamRow>(
+        'SELECT "id", "name", "establishmentId", "createdAt", "updatedAt" FROM public."Team" ORDER BY "createdAt" ASC'
+      ),
+    ]);
 
-  for (const group of groups.values()) {
-    if (group.length < 2) {
-      continue;
+    const teamsByEstablishmentId = new Map<string, TeamRow[]>();
+    for (const team of teamsResult.rows) {
+      const group = teamsByEstablishmentId.get(team.establishmentId) ?? [];
+      group.push(team);
+      teamsByEstablishmentId.set(team.establishmentId, group);
     }
 
-    const canonical = chooseCanonicalEstablishment(group);
-    const canonicalTeams = new Map(
-      canonical.teams.map((team) => [normalizeEstablishmentName(team.name), team])
-    );
+    const establishments = establishmentsResult.rows.map((establishment) => ({
+      ...establishment,
+      teams: teamsByEstablishmentId.get(establishment.id) ?? [],
+    }));
 
-    for (const duplicate of group) {
-      if (duplicate.id === canonical.id) {
+    const groups = new Map<string, typeof establishments>();
+
+    for (const establishment of establishments) {
+      const normalizedName = normalizeEstablishmentName(establishment.name);
+      const group = groups.get(normalizedName) ?? [];
+      group.push(establishment);
+      groups.set(normalizedName, group);
+    }
+
+    for (const group of groups.values()) {
+      if (group.length < 2) {
         continue;
       }
 
-      for (const team of duplicate.teams) {
-        const normalizedTeamName = normalizeEstablishmentName(team.name);
-        const canonicalTeam = canonicalTeams.get(normalizedTeamName);
+      const canonical = chooseCanonicalEstablishment(group);
+      const canonicalTeams = new Map(
+        canonical.teams.map((team) => [normalizeEstablishmentName(team.name), team])
+      );
 
-        if (canonicalTeam) {
-          await mergeTeamIntoCanonical(team.id, canonicalTeam.id);
+      for (const duplicate of group) {
+        if (duplicate.id === canonical.id) {
           continue;
         }
 
-        const movedTeam = await prisma.team.update({
-          where: { id: team.id },
-          data: { establishmentId: canonical.id },
-        });
+        for (const team of duplicate.teams) {
+          const normalizedTeamName = normalizeEstablishmentName(team.name);
+          const canonicalTeam = canonicalTeams.get(normalizedTeamName);
 
-        canonicalTeams.set(normalizedTeamName, movedTeam);
+          if (canonicalTeam) {
+            await mergeTeamIntoCanonical(client, team.id, canonicalTeam.id);
+            continue;
+          }
+
+          await client.query(
+            'UPDATE public."Team" SET "establishmentId" = $2 WHERE "id" = $1',
+            [team.id, canonical.id]
+          );
+
+          canonicalTeams.set(normalizedTeamName, {
+            ...team,
+            establishmentId: canonical.id,
+          });
+        }
+
+        await client.query('DELETE FROM public."Establishment" WHERE "id" = $1', [duplicate.id]);
       }
-
-      await prisma.establishment.delete({ where: { id: duplicate.id } });
     }
+
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
   }
 }
 
@@ -261,11 +290,13 @@ async function runEstablishmentSync() {
     return;
   }
 
-  const existingEstablishments = await prisma.establishment.findMany({
-    select: { id: true, name: true, comuna: true },
-  });
+  const existingEstablishments = await postgres.query<{
+    id: string;
+    name: string;
+    comuna: string | null;
+  }>('SELECT "id", "name", "comuna" FROM public."Establishment"');
   const existingByName = new Map(
-    existingEstablishments.map((item) => [normalizeEstablishmentName(item.name), item])
+    existingEstablishments.rows.map((item) => [normalizeEstablishmentName(item.name), item])
   );
 
   const missingRows = defaultRows.filter((row) => !existingByName.has(normalizeEstablishmentName(row.name)));
@@ -275,12 +306,12 @@ async function runEstablishmentSync() {
   });
 
   if (missingRows.length > 0) {
-    await prisma.establishment.createMany({
-      data: missingRows.map((row) => ({
-        name: row.name,
-        comuna: row.comuna,
-      })),
-    });
+    for (const row of missingRows) {
+      await postgres.query(
+        'INSERT INTO public."Establishment" ("id", "name", "comuna") VALUES ($1, $2, $3)',
+        [crypto.randomUUID(), row.name, row.comuna]
+      );
+    }
   }
 
   for (const row of rowsToUpdate) {
@@ -289,10 +320,10 @@ async function runEstablishmentSync() {
       continue;
     }
 
-    await prisma.establishment.update({
-      where: { id: existing.id },
-      data: { comuna: row.comuna },
-    });
+    await postgres.query(
+      'UPDATE public."Establishment" SET "comuna" = $2 WHERE "id" = $1',
+      [existing.id, row.comuna]
+    );
   }
 
   await ensureTeamsMatchEstablishments();
@@ -309,26 +340,28 @@ export async function ensureDefaultEstablishmentsLoaded() {
 }
 
 export async function getExistingEstablishmentNameSet() {
-  const establishments = await prisma.establishment.findMany({
-    select: { name: true },
-  });
+  const establishments = await postgres.query<{ name: string }>(
+    'SELECT "name" FROM public."Establishment"'
+  );
 
-  return new Set(establishments.map((item) => normalizeEstablishmentName(item.name)));
+  return new Set(establishments.rows.map((item) => normalizeEstablishmentName(item.name)));
 }
 
 export async function ensureTeamsMatchEstablishments() {
-  const establishments = await prisma.establishment.findMany({
-    select: { id: true, name: true },
-  });
-  const teams = await prisma.team.findMany({
-    select: { name: true, establishmentId: true },
-  });
+  const [establishments, teams] = await Promise.all([
+    postgres.query<{ id: string; name: string }>(
+      'SELECT "id", "name" FROM public."Establishment"'
+    ),
+    postgres.query<{ name: string; establishmentId: string }>(
+      'SELECT "name", "establishmentId" FROM public."Team"'
+    ),
+  ]);
 
   const existingTeamKeys = new Set(
-    teams.map((team) => `${team.establishmentId}:${normalizeEstablishmentName(team.name)}`)
+    teams.rows.map((team) => `${team.establishmentId}:${normalizeEstablishmentName(team.name)}`)
   );
 
-  const missingTeams = establishments.filter((establishment) => {
+  const missingTeams = establishments.rows.filter((establishment) => {
     const teamKey = `${establishment.id}:${normalizeEstablishmentName(establishment.name)}`;
     return !existingTeamKeys.has(teamKey);
   });
@@ -337,10 +370,10 @@ export async function ensureTeamsMatchEstablishments() {
     return;
   }
 
-  await prisma.team.createMany({
-    data: missingTeams.map((establishment) => ({
-      name: establishment.name,
-      establishmentId: establishment.id,
-    })),
-  });
+  for (const establishment of missingTeams) {
+    await postgres.query(
+      'INSERT INTO public."Team" ("id", "name", "establishmentId") VALUES ($1, $2, $3)',
+      [crypto.randomUUID(), establishment.name, establishment.id]
+    );
+  }
 }

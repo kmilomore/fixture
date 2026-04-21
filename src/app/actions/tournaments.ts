@@ -1,7 +1,7 @@
 "use server";
 
-import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requestServerApi } from "@/lib/serverApi";
 
 export async function createTournament(formData: FormData) {
   const name = formData.get("name") as string;
@@ -13,48 +13,72 @@ export async function createTournament(formData: FormData) {
   }
 
   try {
-    await prisma.tournament.create({
-      data: { name, disciplineId, categoryId },
+    const response = await requestServerApi<{ id: string }>("/api/tournaments", {
+      method: "POST",
+      body: JSON.stringify({ name, disciplineId, categoryId }),
     });
+
+    if (!response.ok) {
+      return { error: (response.body as { error?: string } | null)?.error ?? "Error al crear el torneo" };
+    }
+
     revalidatePath("/tournaments");
     revalidatePath("/");
     return { success: true };
-  } catch (error) {
+  } catch {
     return { error: "Error al crear el torneo" };
   }
 }
 
 export async function deleteTournament(id: string) {
   try {
-    await prisma.tournament.delete({ where: { id } });
+    const response = await requestServerApi<{ success: true }>(`/api/tournaments/${id}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      return { error: (response.body as { error?: string } | null)?.error ?? "Error al eliminar el torneo (podría tener equipos o partidos asociados)" };
+    }
+
     revalidatePath("/tournaments");
     revalidatePath("/");
     return { success: true };
-  } catch (error) {
+  } catch {
     return { error: "Error al eliminar el torneo (podría tener equipos o partidos asociados)" };
   }
 }
 
 export async function addTeamToTournament(tournamentId: string, teamId: string) {
     try {
-        await prisma.tournamentTeam.create({
-            data: { tournamentId, teamId }
+        const response = await requestServerApi<{ id: string }>(`/api/tournaments/${tournamentId}/teams`, {
+            method: "POST",
+            body: JSON.stringify({ teamId }),
         });
+
+        if (!response.ok) {
+            return { error: (response.body as { error?: string } | null)?.error ?? "Error al agregar equipo (quizás ya está en el torneo)" };
+        }
+
         revalidatePath(`/tournaments/${tournamentId}`);
         return { success: true };
-    } catch (error) {
+    } catch {
         return { error: "Error al agregar equipo (quizás ya está en el torneo)" };
     }
 }
 
 export async function removeTeamFromTournament(id: string, tournamentId: string) {
     try {
-        await prisma.tournamentTeam.delete({
-            where: { id }
+        const response = await requestServerApi<{ success: true }>(`/api/tournaments/${tournamentId}/teams/${id}`, {
+            method: "DELETE",
         });
+
+        if (!response.ok) {
+            return { error: (response.body as { error?: string } | null)?.error ?? "Error al quitar equipo." };
+        }
+
         revalidatePath(`/tournaments/${tournamentId}`);
         return { success: true };
-    } catch (error) {
+    } catch {
         return { error: "Error al quitar equipo." };
     }
 }

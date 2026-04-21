@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import postgres from "@/lib/postgres";
 import {
   generateFixtureMatches,
   type FixtureGenerationOptions,
@@ -15,15 +15,19 @@ export async function POST(
     const { id } = await params;
     const options = (await request.json()) as FixtureGenerationOptions;
 
-    const tournament = await prisma.tournament.findUnique({
-      where: { id },
-      include: {
-        teams: { include: { team: true } },
-        matches: true,
-      },
-    });
+    const [tournament, teams, matches] = await Promise.all([
+      postgres.query<{ id: string }>('SELECT "id" FROM public."Tournament" WHERE "id" = $1', [id]),
+      postgres.query<{ id: string; name: string }>(
+        `SELECT t."id", t."name"
+         FROM public."TournamentTeam" tt
+         INNER JOIN public."Team" t ON t."id" = tt."teamId"
+         WHERE tt."tournamentId" = $1`,
+        [id]
+      ),
+      postgres.query<{ id: string }>('SELECT "id" FROM public."Match" WHERE "tournamentId" = $1', [id]),
+    ]);
 
-    if (!tournament) {
+    if (tournament.rowCount === 0) {
       return NextResponse.json({ error: "Torneo no encontrado" }, { status: 404 });
     }
 
@@ -31,43 +35,43 @@ export async function POST(
       return NextResponse.json({ error: "Debes seleccionar el formato primero" }, { status: 400 });
     }
 
-    if (tournament.teams.length < 2) {
+    if (teams.rows.length < 2) {
       return NextResponse.json(
         { error: "Necesitas al menos 2 equipos para generar el fixture" },
         { status: 400 }
       );
     }
 
-    if (tournament.matches.length > 0) {
+    if (matches.rows.length > 0) {
       return NextResponse.json(
         { error: "Este torneo ya tiene partidos generados" },
         { status: 409 }
       );
     }
 
-    const teams = tournament.teams.map((entry) => ({
-      id: entry.team.id,
-      name: entry.team.name,
-    }));
+    const fixtureMatches = generateFixtureMatches(teams.rows, options);
 
-    const fixtureMatches = generateFixtureMatches(teams, options);
+    for (const match of fixtureMatches) {
+      await postgres.query(
+        `INSERT INTO public."Match" ("id", "tournamentId", "homeTeamId", "awayTeamId", "round", "groupName", "matchLogicIdentifier", "date")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          crypto.randomUUID(),
+          id,
+          match.homeTeamId,
+          match.awayTeamId,
+          match.round,
+          match.groupName,
+          match.matchLogicIdentifier,
+          match.date ?? null,
+        ]
+      );
+    }
 
-    await prisma.match.createMany({
-      data: fixtureMatches.map((match) => ({
-        tournamentId: id,
-        homeTeamId: match.homeTeamId,
-        awayTeamId: match.awayTeamId,
-        round: match.round,
-        groupName: match.groupName,
-        matchLogicIdentifier: match.matchLogicIdentifier,
-        date: match.date ?? null,
-      })),
-    });
-
-    await prisma.tournament.update({
-      where: { id },
-      data: { status: "PLAYING", format: options.format },
-    });
+    await postgres.query(
+      'UPDATE public."Tournament" SET "status" = $2, "format" = $3 WHERE "id" = $1',
+      [id, "PLAYING", options.format]
+    );
 
     return NextResponse.json({ success: true, count: fixtureMatches.length });
   } catch (error) {

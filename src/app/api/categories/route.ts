@@ -1,17 +1,21 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import postgres from "@/lib/postgres";
 import { normalizeCatalogName } from "@/lib/catalogs";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const categories = await prisma.category.findMany({
-      orderBy: { createdAt: "asc" },
-    });
+    const categories = await postgres.query<{
+      id: string;
+      name: string;
+      gender: string;
+      createdAt: Date;
+      updatedAt: Date;
+    }>('SELECT "id", "name", "gender", "createdAt", "updatedAt" FROM public."Category" ORDER BY "createdAt" ASC');
 
     return NextResponse.json(
-      categories.map((category) => ({
+      categories.rows.map((category) => ({
         id: category.id,
         name: category.name,
         gender: category.gender,
@@ -41,9 +45,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const existing = await prisma.category.findMany({ select: { name: true, gender: true } });
+    const existing = await postgres.query<{ name: string; gender: string }>('SELECT "name", "gender" FROM public."Category"');
     if (
-      existing.some(
+      existing.rows.some(
         (item) =>
           normalizeCatalogName(item.name) === normalizeCatalogName(name) &&
           normalizeCatalogName(item.gender) === normalizeCatalogName(gender)
@@ -52,15 +56,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "La categoria ya existe" }, { status: 409 });
     }
 
-    const category = await prisma.category.create({ data: { name, gender } });
+    const category = await postgres.query<{
+      id: string;
+      name: string;
+      gender: string;
+      createdAt: Date;
+      updatedAt: Date;
+    }>(
+      'INSERT INTO public."Category" ("id", "name", "gender") VALUES ($1, $2, $3) RETURNING "id", "name", "gender", "createdAt", "updatedAt"',
+      [crypto.randomUUID(), name, gender]
+    );
 
     return NextResponse.json(
       {
-        id: category.id,
-        name: category.name,
-        gender: category.gender,
-        createdAt: category.createdAt.toISOString(),
-        updatedAt: category.updatedAt.toISOString(),
+        id: category.rows[0].id,
+        name: category.rows[0].name,
+        gender: category.rows[0].gender,
+        createdAt: category.rows[0].createdAt.toISOString(),
+        updatedAt: category.rows[0].updatedAt.toISOString(),
       },
       { status: 201 }
     );

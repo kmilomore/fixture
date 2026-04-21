@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import postgres from "@/lib/postgres";
 
 export const dynamic = "force-dynamic";
 
@@ -9,11 +9,8 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    await prisma.match.deleteMany({ where: { tournamentId: id } });
-    await prisma.tournament.update({
-      where: { id },
-      data: { status: "DRAFT", format: null },
-    });
+    await postgres.query('DELETE FROM public."Match" WHERE "tournamentId" = $1', [id]);
+    await postgres.query('UPDATE public."Tournament" SET "status" = $2, "format" = NULL WHERE "id" = $1', [id, "DRAFT"]);
 
     return NextResponse.json({ success: true });
   } catch (error) {

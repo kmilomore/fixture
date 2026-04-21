@@ -1,8 +1,8 @@
 "use server";
 
 import { normalizeCatalogName } from "@/lib/catalogs";
-import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requestServerApi } from "@/lib/serverApi";
 
 export async function createDiscipline(formData: FormData) {
   const name = formData.get("name") as string;
@@ -12,18 +12,15 @@ export async function createDiscipline(formData: FormData) {
   }
 
   try {
-    const normalizedName = normalizeCatalogName(name);
-    const existing = await prisma.discipline.findMany({
-      select: { name: true },
+    const response = await requestServerApi<{ id: string }>("/api/disciplines", {
+      method: "POST",
+      body: JSON.stringify({ name: name.trim() }),
     });
 
-    if (existing.some((discipline) => normalizeCatalogName(discipline.name) === normalizedName)) {
-      return { error: "La disciplina ya existe" };
+    if (!response.ok) {
+      return { error: (response.body as { error?: string } | null)?.error ?? "Error al crear disciplina" };
     }
 
-    await prisma.discipline.create({
-      data: { name: name.trim() },
-    });
     revalidatePath("/disciplines");
     revalidatePath("/tournaments");
     return { success: true };
@@ -34,7 +31,14 @@ export async function createDiscipline(formData: FormData) {
 
 export async function deleteDiscipline(id: string) {
   try {
-    await prisma.discipline.delete({ where: { id } });
+    const response = await requestServerApi<{ success: true }>(`/api/disciplines/${id}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      return { error: (response.body as { error?: string } | null)?.error ?? "Error al eliminar" };
+    }
+
     revalidatePath("/disciplines");
     revalidatePath("/tournaments");
     return { success: true };
@@ -52,25 +56,15 @@ export async function createCategory(formData: FormData) {
   }
 
   try {
-    const normalizedName = normalizeCatalogName(name);
-    const normalizedGender = normalizeCatalogName(gender);
-    const existing = await prisma.category.findMany({
-      select: { name: true, gender: true },
+    const response = await requestServerApi<{ id: string }>("/api/categories", {
+      method: "POST",
+      body: JSON.stringify({ name: name.trim(), gender: gender.trim() }),
     });
 
-    if (
-      existing.some(
-        (category) =>
-          normalizeCatalogName(category.name) === normalizedName &&
-          normalizeCatalogName(category.gender) === normalizedGender
-      )
-    ) {
-      return { error: "La categoría ya existe" };
+    if (!response.ok) {
+      return { error: (response.body as { error?: string } | null)?.error ?? "Error al crear la categoría" };
     }
 
-    await prisma.category.create({
-      data: { name: name.trim(), gender: gender.trim() },
-    });
     revalidatePath("/disciplines");
     revalidatePath("/tournaments");
     return { success: true };
@@ -81,7 +75,14 @@ export async function createCategory(formData: FormData) {
 
 export async function deleteCategory(id: string) {
   try {
-    await prisma.category.delete({ where: { id } });
+    const response = await requestServerApi<{ success: true }>(`/api/categories/${id}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      return { error: (response.body as { error?: string } | null)?.error ?? "Error al eliminar la categoría" };
+    }
+
     revalidatePath("/disciplines");
     revalidatePath("/tournaments");
     return { success: true };

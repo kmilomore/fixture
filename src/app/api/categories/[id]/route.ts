@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import postgres from "@/lib/postgres";
 
 export const dynamic = "force-dynamic";
 
@@ -9,18 +9,25 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const category = await prisma.category.findUnique({ where: { id } });
+    const category = await postgres.query<{
+      id: string;
+      name: string;
+      gender: string;
+      createdAt: Date;
+      updatedAt: Date;
+    }>('SELECT "id", "name", "gender", "createdAt", "updatedAt" FROM public."Category" WHERE "id" = $1', [id]);
 
-    if (!category) {
+    if (category.rowCount === 0) {
       return NextResponse.json({ error: "Categoria no encontrada" }, { status: 404 });
     }
 
+    const row = category.rows[0];
     return NextResponse.json({
-      id: category.id,
-      name: category.name,
-      gender: category.gender,
-      createdAt: category.createdAt.toISOString(),
-      updatedAt: category.updatedAt.toISOString(),
+      id: row.id,
+      name: row.name,
+      gender: row.gender,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
     });
   } catch (error) {
     console.error("GET /api/categories/[id] failed:", error);
@@ -38,20 +45,30 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const category = await prisma.category.update({
-      where: { id },
-      data: {
-        name: typeof body.name === "string" && body.name.trim() ? body.name.trim() : undefined,
-        gender: typeof body.gender === "string" && body.gender.trim() ? body.gender.trim() : undefined,
-      },
-    });
+    const name = typeof body.name === "string" && body.name.trim() ? body.name.trim() : null;
+    const gender = typeof body.gender === "string" && body.gender.trim() ? body.gender.trim() : null;
+    const category = await postgres.query<{
+      id: string;
+      name: string;
+      gender: string;
+      createdAt: Date;
+      updatedAt: Date;
+    }>(
+      'UPDATE public."Category" SET "name" = COALESCE($2, "name"), "gender" = COALESCE($3, "gender") WHERE "id" = $1 RETURNING "id", "name", "gender", "createdAt", "updatedAt"',
+      [id, name, gender]
+    );
 
+    if (category.rowCount === 0) {
+      return NextResponse.json({ error: "Categoria no encontrada" }, { status: 404 });
+    }
+
+    const row = category.rows[0];
     return NextResponse.json({
-      id: category.id,
-      name: category.name,
-      gender: category.gender,
-      createdAt: category.createdAt.toISOString(),
-      updatedAt: category.updatedAt.toISOString(),
+      id: row.id,
+      name: row.name,
+      gender: row.gender,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
     });
   } catch (error) {
     console.error("PATCH /api/categories/[id] failed:", error);
@@ -68,7 +85,10 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    await prisma.category.delete({ where: { id } });
+    const result = await postgres.query('DELETE FROM public."Category" WHERE "id" = $1', [id]);
+    if (result.rowCount === 0) {
+      return NextResponse.json({ error: "Categoria no encontrada" }, { status: 404 });
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/categories/[id] failed:", error);
