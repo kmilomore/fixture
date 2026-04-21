@@ -23,6 +23,11 @@ La pantalla no guarda preferencias ni expone formularios.
 
 Es, en la práctica, una vista “Acerca de”.
 
+## APIs y acciones disponibles
+
+- No expone endpoints propios.
+- Puede mostrar configuración derivada del entorno o de la documentación operativa, pero no administra datos de negocio.
+
 ## Hallazgos
 
 - El título del módulo sugiere settings reales, pero hoy no hay configuración persistente.

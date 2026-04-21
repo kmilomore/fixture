@@ -67,9 +67,20 @@ Además, el usuario puede seguir agregando más disciplinas y categorías manual
 
 ## APIs y acciones disponibles
 
-No hay API HTTP dedicada.
+API HTTP:
 
-Acciones server:
+- `GET /api/disciplines`
+- `POST /api/disciplines`
+- `GET /api/disciplines/:id`
+- `PATCH /api/disciplines/:id`
+- `DELETE /api/disciplines/:id`
+- `GET /api/categories`
+- `POST /api/categories`
+- `GET /api/categories/:id`
+- `PATCH /api/categories/:id`
+- `DELETE /api/categories/:id`
+
+Acciones server heredadas:
 
 - `createDiscipline(formData)`
 - `deleteDiscipline(id)`

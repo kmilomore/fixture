@@ -1,30 +1,21 @@
-import prisma from "@/lib/prisma";
 import NewEstablishmentForm from "./NewEstablishmentForm";
 import { Building2 } from "lucide-react";
 import CsvImporter from "./CsvImporter";
 import ExportEstablishmentsButton from "./ExportEstablishmentsButton";
 import EstablishmentsTable from "./EstablishmentsTable";
 import { establishmentsContext } from "./context";
+import { fetchServerApi } from "@/lib/serverApi";
 
 export const dynamic = 'force-dynamic';
 
 export default async function EstablishmentsPage() {
-  const establishments = await prisma.establishment.findMany({
-    orderBy: { name: 'asc' },
-    include: {
-      _count: {
-        select: { teams: true }
-      }
-    }
-  });
-
-  const tableRows = establishments.map((establishment) => ({
-    id: establishment.id,
-    name: establishment.name,
-    comuna: establishment.comuna,
-    createdAt: establishment.createdAt.toISOString(),
-    teamsCount: establishment._count.teams,
-  }));
+  const tableRows = await fetchServerApi<Array<{
+    id: string;
+    name: string;
+    comuna: string | null;
+    createdAt: string;
+    teamsCount: number;
+  }>>("/api/establishments");
 
   return (
     <div className="space-y-6 max-w-5xl">

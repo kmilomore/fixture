@@ -93,14 +93,23 @@ Este módulo administra la vida completa de un torneo:
 
 ## APIs y acciones disponibles
 
-No hay API HTTP dedicada.
+API HTTP de torneos:
+
+- `GET /api/tournaments`
+- `POST /api/tournaments`
+- `GET /api/tournaments/:id`
+- `PATCH /api/tournaments/:id`
+- `DELETE /api/tournaments/:id`
+- `GET /api/tournaments/:id/teams`
+- `POST /api/tournaments/:id/teams`
+- `DELETE /api/tournaments/:id/teams/:teamEntryId`
 
 Rutas API de exportación del fixture:
 
 - `/api/tournaments/[id]/export/pdf`
 - `/api/tournaments/[id]/export/excel`
 
-Acciones server:
+Acciones server heredadas:
 
 - `createTournament(formData)`
 - `deleteTournament(id)`
@@ -131,3 +140,4 @@ Acciones relacionadas desde el motor de fixture:
 - El texto visible del selector debe priorizar el nombre de la escuela para que la selección sea más intuitiva.
 - El comportamiento correcto de esta sección depende de mantener el selector como componente controlado.
 - El módulo ya no solo crea torneos: ahora también resuelve la calendarización operativa del fixture.
+- La API HTTP permite desacoplar frontend, automatizaciones o clientes externos del acceso directo a Prisma.

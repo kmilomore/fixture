@@ -1,13 +1,17 @@
-import prisma from "@/lib/prisma";
 import { Layers, Medal, Tags } from "lucide-react";
 import { AddDisciplineForm, AddCategoryForm } from "./Forms";
 import { DeleteDisciplineButton, DeleteCategoryButton } from "./DeleteButtons";
+import { fetchServerApi } from "@/lib/serverApi";
 
 export const dynamic = 'force-dynamic';
 
 export default async function DisciplinesPage() {
-  const disciplines = await prisma.discipline.findMany({ orderBy: { name: 'asc' }});
-  const categories = await prisma.category.findMany({ orderBy: { createdAt: 'asc' }});
+  const data = await fetchServerApi<{
+    disciplines: Array<{ id: string; name: string; createdAt: string; updatedAt: string }>;
+    categories: Array<{ id: string; name: string; gender: string; createdAt: string; updatedAt: string }>;
+  }>("/api/disciplines");
+  const disciplines = data.disciplines;
+  const categories = data.categories;
 
   return (
     <div className="space-y-8 max-w-5xl">

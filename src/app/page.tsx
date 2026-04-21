@@ -1,18 +1,24 @@
 import { Trophy, Users, Building2, Activity } from "lucide-react";
-import prisma from "@/lib/prisma";
+import { fetchServerApi } from "@/lib/serverApi";
 
 export default async function DashboardPage() {
   let establishmentsCount = 0;
   let teamsCount = 0;
   let tournamentsCount = 0;
+  let matchesCount = 0;
   let dataUnavailable = false;
 
   try {
-    [establishmentsCount, teamsCount, tournamentsCount] = await Promise.all([
-      prisma.establishment.count(),
-      prisma.team.count(),
-      prisma.tournament.count(),
-    ]);
+    const dashboard = await fetchServerApi<{
+      establishments: number;
+      teams: number;
+      tournaments: number;
+      matches: number;
+    }>("/api/dashboard");
+    establishmentsCount = dashboard.establishments;
+    teamsCount = dashboard.teams;
+    tournamentsCount = dashboard.tournaments;
+    matchesCount = dashboard.matches;
   } catch (error) {
     dataUnavailable = true;
     console.error("Dashboard stats unavailable:", error);
@@ -22,7 +28,7 @@ export default async function DashboardPage() {
     { name: 'Establecimientos', value: establishmentsCount, icon: Building2, color: 'text-blue-500', bg: 'bg-blue-100' },
     { name: 'Equipos Registrados', value: teamsCount, icon: Users, color: 'text-indigo-500', bg: 'bg-indigo-100' },
     { name: 'Torneos Activos', value: tournamentsCount, icon: Trophy, color: 'text-emerald-500', bg: 'bg-emerald-100' },
-    { name: 'Partidos Jugados', value: 0, icon: Activity, color: 'text-amber-500', bg: 'bg-amber-100' },
+    { name: 'Partidos Registrados', value: matchesCount, icon: Activity, color: 'text-amber-500', bg: 'bg-amber-100' },
   ];
 
   return (

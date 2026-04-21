@@ -1,21 +1,28 @@
-import prisma from "@/lib/prisma";
 import { Users, Shield, Building2 } from "lucide-react";
 import { NewTeamForm, DeleteTeamButton } from "./Components";
+import { fetchServerApi } from "@/lib/serverApi";
 
 export const dynamic = 'force-dynamic';
 
 export default async function TeamsPage() {
-  const teams = await prisma.team.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: {
-      establishment: true
-    }
-  });
-
-  const establishments = await prisma.establishment.findMany({
-    orderBy: { name: 'asc' },
-    select: { id: true, name: true }
-  });
+  const [teams, establishments] = await Promise.all([
+    fetchServerApi<Array<{
+      id: string;
+      name: string;
+      establishmentId: string;
+      establishment: { id: string; name: string; comuna: string | null };
+      createdAt: string;
+      updatedAt: string;
+    }>>("/api/teams"),
+    fetchServerApi<Array<{
+      id: string;
+      name: string;
+      comuna: string | null;
+      teamsCount: number;
+      createdAt: string;
+      updatedAt: string;
+    }>>("/api/establishments"),
+  ]);
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -29,7 +36,7 @@ export default async function TeamsPage() {
             Cada establecimiento genera su equipo base automáticamente y puedes seguir agregando más equipos si lo necesitas.
           </p>
         </div>
-        <NewTeamForm establishments={establishments} />
+        <NewTeamForm establishments={establishments.map((establishment) => ({ id: establishment.id, name: establishment.name }))} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

@@ -1,24 +1,32 @@
-import prisma from "@/lib/prisma";
 import { Trophy, CalendarDays, ExternalLink, Settings2 } from "lucide-react";
 import { NewTournamentForm, DeleteTournamentButton } from "./Components";
 import Link from "next/link";
+import { fetchServerApi } from "@/lib/serverApi";
 
 export const dynamic = 'force-dynamic';
 
 export default async function TournamentsPage() {
-  const tournaments = await prisma.tournament.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: {
-      discipline: true,
-      category: true,
-      _count: {
-        select: { teams: true, matches: true }
-      }
-    }
-  });
+  const [tournaments, catalogData] = await Promise.all([
+    fetchServerApi<Array<{
+      id: string;
+      name: string;
+      format: string | null;
+      status: string;
+      discipline: { id: string; name: string };
+      category: { id: string; name: string; gender: string };
+      teamsCount: number;
+      matchesCount: number;
+      createdAt: string;
+      updatedAt: string;
+    }>>("/api/tournaments"),
+    fetchServerApi<{
+      disciplines: Array<{ id: string; name: string; createdAt: string; updatedAt: string }>;
+      categories: Array<{ id: string; name: string; gender: string; createdAt: string; updatedAt: string }>;
+    }>("/api/disciplines"),
+  ]);
 
-  const disciplines = await prisma.discipline.findMany({ orderBy: { name: 'asc' }});
-  const categories = await prisma.category.findMany({ orderBy: { createdAt: 'asc' }});
+  const disciplines = catalogData.disciplines;
+  const categories = catalogData.categories;
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -59,11 +67,11 @@ export default async function TournamentsPage() {
               
               <div className="grid grid-cols-2 gap-3 mt-5 pt-4 border-t border-slate-100">
                 <div className="flex items-center gap-2 justify-center py-2 bg-slate-50 rounded-lg">
-                    <span className="font-bold text-xl text-slate-700">{t._count.teams}</span>
+                    <span className="font-bold text-xl text-slate-700">{t.teamsCount}</span>
                     <span className="text-xs font-medium text-slate-500 uppercase tracking-widest">Equipos</span>
                 </div>
                 <div className="flex items-center gap-2 justify-center py-2 bg-slate-50 rounded-lg">
-                    <span className="font-bold text-xl text-slate-700">{t._count.matches}</span>
+                    <span className="font-bold text-xl text-slate-700">{t.matchesCount}</span>
                     <span className="text-xs font-medium text-slate-500 uppercase tracking-widest">Partidos</span>
                 </div>
               </div>

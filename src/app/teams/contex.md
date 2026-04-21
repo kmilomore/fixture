@@ -40,9 +40,15 @@ El módulo también permite crear equipos adicionales manualmente.
 
 ## APIs y acciones disponibles
 
-No hay API HTTP dedicada.
+API HTTP:
 
-Acciones server:
+- `GET /api/teams`
+- `POST /api/teams`
+- `GET /api/teams/:id`
+- `PATCH /api/teams/:id`
+- `DELETE /api/teams/:id`
+
+Acciones server heredadas:
 
 - `createTeam(formData)`
 - `deleteTeam(id)`
@@ -59,3 +65,4 @@ Acciones server:
 - El módulo dejó de ser un CRUD independiente: ahora refleja una política de sincronización con establecimientos.
 - No hay deduplicación fuerte para equipos manuales fuera del vínculo por establecimiento, por lo que el usuario todavía puede crear variantes adicionales si quiere.
 - Si más adelante se requiere separar “equipo base” de “equipo adicional”, conviene agregar un campo booleano o tipo.
+- Para frontend externo o integraciones, la vía recomendada ahora es la API HTTP y no consultas directas desde el módulo.

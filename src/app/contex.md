@@ -41,6 +41,16 @@ Esto significa que el módulo raíz actúa como punto de entrada operativo para 
 - `src/lib/establishments.ts`
 - `src/components/layout/Sidebar.tsx`
 
+## Endpoints HTTP del módulo raíz
+
+- `GET /api/dashboard`
+  - devuelve conteos generales de establecimientos, equipos, torneos y partidos.
+
+## Nota arquitectónica actual
+
+- La app mantiene Prisma como capa interna de acceso a datos del servidor.
+- La exposición pública para frontend o integraciones ahora debe apoyarse en rutas `src/app/api/**`.
+
 ## Hallazgos
 
 - El layout no es solo visual; también ejecuta lógica de sincronización de datos.

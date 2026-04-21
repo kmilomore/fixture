@@ -29,7 +29,11 @@ Actúa como hub de navegación rápida hacia los módulos principales relacionad
 
 ## APIs y acciones disponibles
 
-- No expone APIs.
+- No expone endpoints propios.
+- Orquesta navegación hacia endpoints de:
+  - `/api/tournaments`
+  - `/api/tournaments/:id`
+  - `/api/matches/:id`
 - No ejecuta server actions.
 
 ## Hallazgos

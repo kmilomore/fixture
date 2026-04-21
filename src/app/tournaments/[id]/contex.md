@@ -47,6 +47,25 @@ Incluye:
 - `../../../api/tournaments/[id]/export/excel/route.ts`
   - genera un Excel con grupos, partidos, fecha, marcador y lugar.
 
+- `../../../api/tournaments/[id]/teams/route.ts`
+  - `GET` participantes actuales.
+  - `POST` inscripción de equipo al torneo.
+
+- `../../../api/tournaments/[id]/teams/[teamEntryId]/route.ts`
+  - `DELETE` retiro de un equipo inscrito.
+
+- `../../../api/tournaments/[id]/fixture/format/route.ts`
+  - `PUT` guarda el formato elegido.
+
+- `../../../api/tournaments/[id]/fixture/generate/route.ts`
+  - `POST` genera los partidos con reglas de calendario.
+
+- `../../../api/tournaments/[id]/fixture/reset/route.ts`
+  - `POST` elimina partidos y vuelve el torneo a `DRAFT`.
+
+- `../../../api/matches/[id]/route.ts`
+  - `PATCH` actualiza marcador, fecha, lugar y estado de un partido.
+
 - `../../../lib/tournamentExports.ts`
   - normaliza y centraliza los datos exportables del torneo.
 
@@ -114,6 +133,19 @@ Con eso, el sistema:
 3. Las rutas API consultan el torneo actual y agrupan los partidos igual que la UI.
 4. El PDF genera una versión visual resumida y legible para impresión o envío.
 5. El Excel genera una planilla estructurada para edición, revisión o distribución administrativa.
+
+## Endpoints operativos del submódulo
+
+- `GET /api/tournaments/:id`
+- `GET /api/tournaments/:id/teams`
+- `POST /api/tournaments/:id/teams`
+- `DELETE /api/tournaments/:id/teams/:teamEntryId`
+- `PUT /api/tournaments/:id/fixture/format`
+- `POST /api/tournaments/:id/fixture/generate`
+- `POST /api/tournaments/:id/fixture/reset`
+- `PATCH /api/matches/:id`
+- `GET /api/tournaments/:id/export/pdf`
+- `GET /api/tournaments/:id/export/excel`
 
 ### Qué debe hacer esta sección
 

@@ -28,9 +28,8 @@ Cada establecimiento puede:
 
 - `page.tsx`
   - Página server component del módulo.
-  - Consulta establecimientos desde Prisma.
-  - Construye los datos serializables para la tabla.
-  - Renderiza acciones principales: exportar, importar y crear.
+  - Renderiza la vista principal del directorio.
+  - La capa API del módulo vive en `../api/establishments/**`.
 
 - `EstablishmentsTable.tsx`
   - Componente client.
@@ -75,6 +74,15 @@ Cada establecimiento puede:
 
 - `../api/establishments/export/route.ts`
   - Exportación CSV del padrón vigente.
+
+- `../api/establishments/route.ts`
+  - `GET` listado con filtros `q` y `comuna`.
+  - `POST` alta de establecimiento.
+
+- `../api/establishments/[id]/route.ts`
+  - `GET` detalle de establecimiento.
+  - `PATCH` edición.
+  - `DELETE` baja.
 
 ### Configuración y datos fuente
 
@@ -218,6 +226,15 @@ Ejemplos que se consideran equivalentes:
 ### Directorio base persistente
 
 Se decidió que el CSV integrado no sea solo una carga inicial única, sino una fuente de sincronización.
+
+## Endpoints del módulo
+
+- `GET /api/establishments`
+- `POST /api/establishments`
+- `GET /api/establishments/:id`
+- `PATCH /api/establishments/:id`
+- `DELETE /api/establishments/:id`
+- `GET /api/establishments/export`
 
 Esto significa:
 

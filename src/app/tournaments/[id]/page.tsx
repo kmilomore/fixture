@@ -1,41 +1,78 @@
-import prisma from "@/lib/prisma";
 import { Trophy, Settings, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ManageTournamentTeams } from "./ClientComponents";
 import { FixtureEngine } from "./FixtureEngine";
+import { fetchServerApi } from "@/lib/serverApi";
 
 export const dynamic = 'force-dynamic';
 
 export default async function TournamentDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const tournament = await prisma.tournament.findUnique({
-    where: { id },
-    include: {
-      discipline: true,
-      category: true,
-      teams: {
-        include: {
-          team: { include: { establishment: true } }
-        }
-      },
-      matches: {
-        include: {
-          homeTeam: { include: { establishment: true } },
-          awayTeam: { include: { establishment: true } },
-        },
-        orderBy: [{ round: "asc" }, { createdAt: "asc" }]
-      }
-    }
-  });
+  let tournament: {
+    id: string;
+    name: string;
+    format: string | null;
+    status: string;
+    discipline: { id: string; name: string };
+    category: { id: string; name: string; gender: string };
+    teams: Array<{
+      id: string;
+      tournamentId: string;
+      teamId: string;
+      team: {
+        id: string;
+        name: string;
+        establishmentId: string;
+        establishment: { id: string; name: string; comuna?: string | null };
+        createdAt: string;
+        updatedAt: string;
+      };
+    }>;
+    matches: Array<{
+      id: string;
+      tournamentId: string;
+      homeTeamId: string | null;
+      awayTeamId: string | null;
+      date: string | null;
+      location: string | null;
+      homeScore: number | null;
+      awayScore: number | null;
+      isFinished: boolean;
+      round: number | null;
+      groupName: string | null;
+      matchLogicIdentifier: string | null;
+      createdAt: string;
+      updatedAt: string;
+      homeTeam: {
+        id: string;
+        name: string;
+        establishmentId: string;
+        establishment: { id: string; name: string; comuna?: string | null };
+        createdAt: string;
+        updatedAt: string;
+      } | null;
+      awayTeam: {
+        id: string;
+        name: string;
+        establishmentId: string;
+        establishment: { id: string; name: string; comuna?: string | null };
+        createdAt: string;
+        updatedAt: string;
+      } | null;
+    }>;
+  };
+  let availableTeams: Array<{ id: string; name: string; establishment: { name: string } }>;
 
-  if (!tournament) notFound();
-
-  const availableTeams = await prisma.team.findMany({
-    include: { establishment: true },
-    orderBy: { name: 'asc' }
-  });
+  try {
+    [tournament, availableTeams] = await Promise.all([
+      fetchServerApi<typeof tournament>(`/api/tournaments/${id}`),
+      fetchServerApi<Array<{ id: string; name: string; establishment: { name: string } }>>("/api/teams"),
+    ]);
+  } catch {
+    notFound();
+  }
 
   // Serializar el torneo para el client component
   const serializedTournament = {
@@ -45,9 +82,9 @@ export default async function TournamentDetailsPage({ params }: { params: Promis
     teams: tournament.teams,
     matches: tournament.matches.map(m => ({
       ...m,
-      date: m.date?.toISOString() ?? null,
-      createdAt: m.createdAt.toISOString(),
-      updatedAt: m.updatedAt.toISOString(),
+      date: m.date ?? null,
+      createdAt: m.createdAt,
+      updatedAt: m.updatedAt,
     }))
   };
 
