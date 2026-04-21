@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { ManageTournamentTeams, TournamentStatusControls } from "./ClientComponents";
 import { FixtureEngine } from "./FixtureEngine";
 import { CalendarView } from "./CalendarView";
-import { fetchServerApi } from "@/lib/serverApi";
+import { listTeams } from "@/features/teams/application/team-service";
+import { getTournamentDetail } from "@/features/tournaments/application/tournament-service";
 import { getTournamentStatusPresentation, type TournamentStatus } from "@/lib/tournamentLifecycle";
 import type { FixtureSchedulingRules } from "@/lib/fixtureEngine";
 import type { MatchIncidentType, MatchStatus } from "@/lib/matchLifecycle";
@@ -120,8 +121,8 @@ export default async function TournamentDetailsPage({
 
   try {
     [tournament, availableTeams] = await Promise.all([
-      fetchServerApi<typeof tournament>(`/api/tournaments/${id}`),
-      fetchServerApi<Array<{ id: string; name: string; establishment: { name: string } }>>("/api/teams"),
+      getTournamentDetail(id),
+      listTeams(),
     ]);
   } catch {
     notFound();

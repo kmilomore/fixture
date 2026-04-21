@@ -1,45 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { listTeams } from "@/features/teams/application/team-service";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = getSupabase();
-    const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
-    const establishmentId = request.nextUrl.searchParams.get("establishmentId")?.trim() ?? "";
-
-    let query = supabase
-      .from("Team")
-      .select("id, name, establishmentId, createdAt, updatedAt, Establishment(id, name, comuna)")
-      .order("createdAt", { ascending: false });
-
-    if (establishmentId) query = query.eq("establishmentId", establishmentId);
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    let rows = data ?? [];
-    if (q) {
-      const lower = q.toLowerCase();
-      rows = rows.filter(
-        (t) =>
-          t.name.toLowerCase().includes(lower) ||
-          (t.Establishment as unknown as { name: string } | null)?.name.toLowerCase().includes(lower)
-      );
-    }
-
     return NextResponse.json(
-      rows.map((t) => {
-        const est = (t.Establishment as unknown) as { id: string; name: string; comuna: string | null } | null;
-        return {
-          id: t.id,
-          name: t.name,
-          establishmentId: t.establishmentId,
-          establishment: { id: est?.id ?? t.establishmentId, name: est?.name ?? "", comuna: est?.comuna ?? null },
-          createdAt: t.createdAt,
-          updatedAt: t.updatedAt,
-        };
+      await listTeams({
+        q: request.nextUrl.searchParams.get("q") ?? undefined,
+        establishmentId: request.nextUrl.searchParams.get("establishmentId") ?? undefined,
       })
     );
   } catch (error) {

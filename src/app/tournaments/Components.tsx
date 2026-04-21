@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useTransition, useState } from "react";
 import { Trash2, Plus } from "lucide-react";
 import { deleteTournament, createTournament } from "../actions/tournaments";
-import Link from "next/link";
 
 export function DeleteTournamentButton({ id }: { id: string }) {
   const [isPending, startTransition] = useTransition();

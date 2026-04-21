@@ -28,29 +28,32 @@ Sistema web de gestión de torneos deportivos. Permite crear torneos, administra
 
 ## Arquitectura general
 
-```
+```text
 src/
 ├── app/
-│   ├── layout.tsx              # Layout raíz: sidebar + header
+│   ├── layout.tsx              # Layout raiz: sidebar + header
 │   ├── page.tsx                # Dashboard (/)
-│   ├── api/                    # API Routes (Next.js Route Handlers)
-│   ├── actions/                # Server Actions (mutaciones)
-│   ├── tournaments/            # Módulo torneos
-│   ├── establishments/         # Módulo establecimientos
-│   ├── teams/                  # Módulo equipos
-│   ├── disciplines/            # Módulo disciplinas y categorías
-│   ├── fixture/                # Módulo fixture (navegación)
-│   └── settings/               # Configuración del sistema
-└── lib/
-    ├── supabase.ts             # Cliente Supabase
-    ├── fixtureEngine.ts        # Algoritmos de generación de fixture
-    ├── establishments.ts       # Lógica de deduplicación y CSV
-    ├── tournamentExports.ts    # Preparación de datos para Excel/PDF
-    ├── catalogs.ts             # Seed de datos por defecto
-    └── serverApi.ts            # Fetch utilitario server-side
+│   ├── api/                    # API Routes (Route Handlers)
+│   ├── actions/                # Server Actions existentes
+│   ├── tournaments/
+│   ├── establishments/
+│   ├── teams/
+│   ├── disciplines/
+│   ├── fixture/
+│   └── settings/
+├── components/                 # UI compartida
+├── features/                   # Dominio por modulo
+│   ├── fixture/
+│   │   └── domain/
+│   └── tournaments/
+│       └── domain/
+├── infrastructure/             # Adaptadores concretos
+│   ├── database/
+│   └── supabase/
+└── lib/                        # Compatibilidad temporal mientras migra la app
 ```
 
-El patrón de datos es: **Server Components** leen datos directamente (con `fetchServerApi`), las **mutaciones** van por **Server Actions** (`src/app/actions/`) o por **API Routes** cuando el cliente necesita la respuesta.
+La aplicacion queda oficialmente orientada a web. Electron se elimina como objetivo de ejecucion y `src/lib` pasa a ser una capa de transicion mientras la logica se mueve a `features/` e `infrastructure/`.
 
 ---
 

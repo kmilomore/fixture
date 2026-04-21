@@ -1,62 +1,76 @@
 # Fixture Pro
 
-Sistema web para gestión de campeonatos, equipos, establecimientos y generación de fixtures, preparado para despliegue en Vercel con base de datos PostgreSQL alojada.
+Sistema web para gestion de campeonatos, equipos, establecimientos y generacion de fixtures, desplegable como aplicacion web con Next.js.
 
-## Stack objetivo
+## Stack actual
 
 - Next.js App Router
-- Prisma ORM
-- PostgreSQL hospedado
+- React 19
+- TypeScript
+- Supabase sobre PostgreSQL
 - Vercel para despliegue web
 
 ## Variables de entorno
 
-Crea tus variables desde [.env.example](c:/Users/camil/OneDrive/Documentos/programa%20fixture/.env.example) o configúralas directamente en Vercel:
+Configura estas variables en desarrollo local o en Vercel:
 
 ```env
-DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/fixture_pro?schema=public"
-DIRECT_URL="postgresql://USER:PASSWORD@HOST:5432/fixture_pro?schema=public"
+NEXT_PUBLIC_SUPABASE_URL="https://tu-proyecto.supabase.co"
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="tu-clave-publica"
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/fixture_pro"
+ENABLE_STARTUP_SYNC="true"
 ```
 
 Notas:
 
-- `DATABASE_URL` es la conexión usada por la aplicación.
-- `DIRECT_URL` se usa para migraciones Prisma cuando el proveedor lo requiere.
+- `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` son obligatorias para las rutas y consultas sobre Supabase.
+- `DATABASE_URL` se usa en los modulos que trabajan con SQL directo.
+- `ENABLE_STARTUP_SYNC` activa la carga automatica de catalogos y establecimientos por defecto.
 
 ## Desarrollo local
 
 ```bash
 npm install
-npm run prisma:sync
 npm run dev
 ```
 
-La aplicación quedará en `http://localhost:3000`.
+La aplicacion queda disponible en `http://localhost:3000`.
 
-## Despliegue en Vercel
+## Arquitectura inicial
 
-1. Sube el repositorio a GitHub.
-2. Importa el proyecto en Vercel.
-3. Configura `DATABASE_URL` y `DIRECT_URL` en el panel de variables de entorno.
-4. Usa `npm run vercel-build` como comando de build si quieres dejarlo explícito.
-5. Ejecuta `npm run prisma:migrate:deploy` sobre la base productiva cuando trabajes con migraciones versionadas.
+La fase 1 de refactorizacion deja el proyecto explicitamente orientado a web y abre una estructura limpia sin romper imports existentes:
+
+```text
+src/
+	app/                # Rutas, layouts y componentes de pagina
+	components/         # Componentes compartidos de UI
+	features/           # Dominio y casos de uso por modulo
+		fixture/
+			domain/
+		tournaments/
+			domain/
+	infrastructure/     # Adaptadores concretos a BD y servicios externos
+		database/
+		supabase/
+	lib/                # Capa de compatibilidad temporal
+```
 
 ## Base de datos
 
-El proyecto ya no está orientado a SQLite local como infraestructura principal.
+El proyecto es web-only. No mantiene una variante desktop ni una base local embebida.
 
 La base recomendada es PostgreSQL alojado, por ejemplo:
 
-- Neon
 - Supabase Postgres
+- Neon
 - Railway Postgres
 - PostgreSQL administrado propio
 
 ## CSV de establecimientos
 
-El directorio base sigue cargándose desde `public/formacion_directorio_territorio.csv` y se sincroniza automáticamente con la base de datos al iniciar la aplicación.
+El directorio base sigue cargandose desde `public/formacion_directorio_territorio.csv` y se sincroniza automaticamente con la base de datos al iniciar la aplicacion.
 
-La importación manual sigue aceptando columnas como:
+La importacion manual acepta columnas como:
 
 - `nombre`
 - `name`
@@ -68,11 +82,6 @@ Ejemplo:
 ```csv
 nombre,comuna
 Colegio San Alberto,Santiago
-Escuela Básica Norte,Puente Alto
-Liceo Politécnico Sur,La Florida
+Escuela Basica Norte,Puente Alto
+Liceo Politecnico Sur,La Florida
 ```
-
-## Nota sobre Electron
-
-La configuración de Electron todavía existe en el repositorio como legado, pero la infraestructura objetivo del proyecto ahora es web sobre Vercel + PostgreSQL.
-# fixture

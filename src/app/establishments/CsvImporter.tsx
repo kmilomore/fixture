@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Papa from "papaparse";
-import { bulkCreateEstablishments } from "../actions/fixture";
+import { bulkCreateEstablishments } from "../actions/establishments";
 import { Upload, FileText, CheckCircle2, X } from "lucide-react";
 
 type PreviewRow = { name: string; comuna: string | null; valid: boolean };
@@ -103,7 +103,10 @@ export default function CsvImporter() {
 
         <div className="bg-blue-50 border border-blue-200 text-blue-800 text-sm p-3 rounded-lg mb-4">
           <p className="font-semibold">¿Cómo preparar el CSV?</p>
-          <p className="mt-1">El archivo CSV debe tener una columna llamada: <code className="font-mono bg-blue-100 px-1 rounded">nombre</code> (o "name", "colegio", "establecimiento"). La columna <code className="font-mono bg-blue-100 px-1 rounded">comuna</code> es opcional.</p>
+          <p className="mt-1">
+            El archivo CSV debe tener una columna llamada: <code className="font-mono bg-blue-100 px-1 rounded">nombre</code>
+            {" "}(o &quot;name&quot;, &quot;colegio&quot;, &quot;establecimiento&quot;). La columna <code className="font-mono bg-blue-100 px-1 rounded">comuna</code> es opcional.
+          </p>
         </div>
 
         <label className="block w-full border-2 border-dashed border-slate-300 rounded-xl p-6 text-center cursor-pointer hover:border-blue-400 transition-colors bg-slate-50">

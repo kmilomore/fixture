@@ -1,8 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requestServerApi } from "@/lib/serverApi";
 import type { TournamentStatus } from "@/lib/tournamentLifecycle";
+import {
+  addTeamToTournament as addTeamToTournamentService,
+  createTournament as createTournamentService,
+  deleteTournament as deleteTournamentService,
+  removeTeamFromTournament as removeTeamFromTournamentService,
+  updateTournament,
+} from "@/features/tournaments/application/tournament-service";
+import { asServiceError } from "@/shared/lib/service-error";
 
 export async function createTournament(formData: FormData) {
   const name = formData.get("name") as string;
@@ -14,92 +21,59 @@ export async function createTournament(formData: FormData) {
   }
 
   try {
-    const response = await requestServerApi<{ id: string }>("/api/tournaments", {
-      method: "POST",
-      body: JSON.stringify({ name, disciplineId, categoryId }),
-    });
-
-    if (!response.ok) {
-      return { error: (response.body as { error?: string } | null)?.error ?? "Error al crear el torneo" };
-    }
+    await createTournamentService({ name, disciplineId, categoryId });
 
     revalidatePath("/tournaments");
     revalidatePath("/");
     return { success: true };
-  } catch {
-    return { error: "Error al crear el torneo" };
+  } catch (error) {
+    return { error: asServiceError(error, "Error al crear el torneo").message };
   }
 }
 
 export async function deleteTournament(id: string) {
   try {
-    const response = await requestServerApi<{ success: true }>(`/api/tournaments/${id}`, {
-      method: "DELETE",
-    });
-
-    if (!response.ok) {
-      return { error: (response.body as { error?: string } | null)?.error ?? "Error al eliminar el torneo (podría tener equipos o partidos asociados)" };
-    }
+    await deleteTournamentService(id);
 
     revalidatePath("/tournaments");
     revalidatePath("/");
     return { success: true };
-  } catch {
-    return { error: "Error al eliminar el torneo (podría tener equipos o partidos asociados)" };
+  } catch (error) {
+    return { error: asServiceError(error, "Error al eliminar el torneo (podria tener equipos o partidos asociados)").message };
   }
 }
 
 export async function addTeamToTournament(tournamentId: string, teamId: string) {
     try {
-        const response = await requestServerApi<{ id: string }>(`/api/tournaments/${tournamentId}/teams`, {
-            method: "POST",
-            body: JSON.stringify({ teamId }),
-        });
-
-        if (!response.ok) {
-            return { error: (response.body as { error?: string } | null)?.error ?? "Error al agregar equipo (quizás ya está en el torneo)" };
-        }
+        await addTeamToTournamentService({ tournamentId, teamId });
 
         revalidatePath(`/tournaments/${tournamentId}`);
         return { success: true };
-    } catch {
-        return { error: "Error al agregar equipo (quizás ya está en el torneo)" };
+    } catch (error) {
+        return { error: asServiceError(error, "Error al agregar equipo (quizas ya esta en el torneo)").message };
     }
 }
 
 export async function removeTeamFromTournament(id: string, tournamentId: string) {
     try {
-        const response = await requestServerApi<{ success: true }>(`/api/tournaments/${tournamentId}/teams/${id}`, {
-            method: "DELETE",
-        });
-
-        if (!response.ok) {
-            return { error: (response.body as { error?: string } | null)?.error ?? "Error al quitar equipo." };
-        }
+        await removeTeamFromTournamentService({ tournamentId, teamEntryId: id });
 
         revalidatePath(`/tournaments/${tournamentId}`);
         return { success: true };
-    } catch {
-        return { error: "Error al quitar equipo." };
+    } catch (error) {
+        return { error: asServiceError(error, "Error al quitar equipo.").message };
     }
 }
 
 export async function updateTournamentStatus(tournamentId: string, status: TournamentStatus) {
   try {
-    const response = await requestServerApi<{ id: string; status: TournamentStatus }>(`/api/tournaments/${tournamentId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ status }),
-    });
-
-    if (!response.ok) {
-      return { error: (response.body as { error?: string } | null)?.error ?? "Error al actualizar el estado del torneo" };
-    }
+    await updateTournament({ id: tournamentId, status });
 
     revalidatePath(`/tournaments/${tournamentId}`);
     revalidatePath("/tournaments");
     revalidatePath("/");
     return { success: true };
-  } catch {
-    return { error: "Error al actualizar el estado del torneo" };
+  } catch (error) {
+    return { error: asServiceError(error, "Error al actualizar el estado del torneo").message };
   }
 }

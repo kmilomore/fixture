@@ -1,7 +1,8 @@
-import { Trophy, CalendarDays, ExternalLink, Settings2 } from "lucide-react";
+import { Trophy, ExternalLink, Settings2 } from "lucide-react";
 import { NewTournamentForm, DeleteTournamentButton } from "./Components";
 import Link from "next/link";
-import { fetchServerApi } from "@/lib/serverApi";
+import { listCatalogs } from "@/features/disciplines/application/catalog-service";
+import { listTournaments } from "@/features/tournaments/application/tournament-service";
 import { getTournamentStatusPresentation, type TournamentStatus } from "@/lib/tournamentLifecycle";
 
 export const dynamic = 'force-dynamic';
@@ -23,10 +24,7 @@ export default async function TournamentsPage() {
   let categories: Array<{ id: string; name: string; gender: string; createdAt: string; updatedAt: string }> = [];
   let loadError = false;
   try {
-    const [tournamentsData, catalogData] = await Promise.all([
-      fetchServerApi<typeof tournaments>("/api/tournaments"),
-      fetchServerApi<{ disciplines: typeof disciplines; categories: typeof categories }>("/api/disciplines"),
-    ]);
+    const [tournamentsData, catalogData] = await Promise.all([listTournaments(), listCatalogs()]);
     tournaments = tournamentsData;
     disciplines = catalogData.disciplines;
     categories = catalogData.categories;
