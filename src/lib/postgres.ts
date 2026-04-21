@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { Pool, QueryResultRow, QueryResult } from "pg";
 
 declare global {
   var postgresPool: Pool | undefined;
@@ -19,10 +19,19 @@ function createPool() {
   });
 }
 
-const pool = globalThis.postgresPool ?? createPool();
+function getPool() {
+  if (!globalThis.postgresPool) {
+    globalThis.postgresPool = createPool();
+  }
 
-if (process.env.NODE_ENV !== "production") {
-  globalThis.postgresPool = pool;
+  return globalThis.postgresPool;
 }
 
-export default pool;
+const postgres = {
+  query: <T extends QueryResultRow = any>(...args: any[]): Promise<QueryResult<T>> =>
+    (getPool().query as any)(...args),
+  connect: () => getPool().connect(),
+  end: () => getPool().end(),
+};
+
+export default postgres;
