@@ -8,7 +8,9 @@ import {
   estimateRequiredMatchdays,
   type FixtureFormat,
   type FixtureGenerationOptions,
+  type FixtureSchedulingRules,
 } from "@/lib/fixtureEngine";
+import { DEFAULT_SCHEDULING_RULES, type TournamentStatus } from "@/lib/tournamentLifecycle";
 
 type Team = { id: string; name: string; establishment: { name: string } };
 type MatchWithTeams = {
@@ -29,7 +31,8 @@ type Props = {
   tournament: {
     id: string;
     format: string | null;
-    status: string;
+    status: TournamentStatus;
+    schedulingRules?: FixtureSchedulingRules;
     teams: { team: Team }[];
     matches: MatchWithTeams[];
   };
@@ -45,12 +48,6 @@ const WEEKDAYS = [
   { value: 0, label: "Dom" },
 ];
 
-function getDefaultDateOffset(days: number) {
-  const nextDate = new Date();
-  nextDate.setDate(nextDate.getDate() + days);
-  return nextDate.toISOString().slice(0, 10);
-}
-
 function getPlaceholderTeams(match: MatchWithTeams) {
   if (match.homeTeam || match.awayTeam || !match.matchLogicIdentifier || !match.matchLogicIdentifier.includes(" vs ")) {
     return null;
@@ -64,22 +61,23 @@ function getPlaceholderTeams(match: MatchWithTeams) {
 }
 
 export function FixtureEngine({ tournament }: Props) {
+  const schedulingRules = tournament.schedulingRules ?? DEFAULT_SCHEDULING_RULES;
   const [selectedFormat, setSelectedFormat] = useState<FixtureFormat | null>(
     (tournament.format as FixtureFormat) || null
   );
   const [groupCount, setGroupCount] = useState(1);
-  const [startDate, setStartDate] = useState(getDefaultDateOffset(0));
-  const [endDate, setEndDate] = useState(getDefaultDateOffset(30));
-  const [matchesPerMatchday, setMatchesPerMatchday] = useState(4);
-  const [dailyStartTime, setDailyStartTime] = useState("09:00");
-  const [dailyEndTime, setDailyEndTime] = useState("18:00");
-  const [matchDurationMinutes, setMatchDurationMinutes] = useState(90);
-  const [allowedWeekdays, setAllowedWeekdays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [startDate, setStartDate] = useState(schedulingRules.startDate);
+  const [endDate, setEndDate] = useState(schedulingRules.endDate);
+  const [matchesPerMatchday, setMatchesPerMatchday] = useState(schedulingRules.matchesPerMatchday);
+  const [dailyStartTime, setDailyStartTime] = useState(schedulingRules.dailyStartTime);
+  const [dailyEndTime, setDailyEndTime] = useState(schedulingRules.dailyEndTime);
+  const [matchDurationMinutes, setMatchDurationMinutes] = useState(schedulingRules.matchDurationMinutes);
+  const [allowedWeekdays, setAllowedWeekdays] = useState<number[]>(schedulingRules.allowedWeekdays);
   const [isPending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [editingMatch, setEditingMatch] = useState<string | null>(null);
 
-  const isGenerated = tournament.status === "PLAYING";
+  const isGenerated = ["SCHEDULED", "PLAYING", "PAUSED", "FINISHED"].includes(tournament.status);
   const estimatedMatchCount = selectedFormat
     ? estimateFixtureMatchCount(
         tournament.teams.map(({ team }) => ({ id: team.id, name: team.name })),
@@ -135,7 +133,7 @@ export function FixtureEngine({ tournament }: Props) {
     if (!options) return;
     startTransition(async () => {
       setMsg(null);
-      await setTournamentFormat(tournament.id, options.format);
+      await setTournamentFormat(tournament.id, options.format, options.schedulingRules);
       const result = await generateFixture(tournament.id, options);
       if (result.error) setMsg(`❌ ${result.error}`);
       else setMsg(`✅ Fixture generado: ${result.count} partidos creados.`);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { DEFAULT_SCHEDULING_RULES, deriveTournamentStatus, schedulingRulesFromRow, schedulingRulesToRow } from "@/lib/tournamentLifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from("Tournament")
-      .select("id, name, format, status, createdAt, updatedAt, Discipline(id, name), Category(id, name, gender), TournamentTeam(id), Match(id)")
+      .select("id, name, format, status, createdAt, updatedAt, scheduleStartDate, scheduleEndDate, scheduleMatchesPerMatchday, scheduleAllowedWeekdays, scheduleDailyStartTime, scheduleDailyEndTime, scheduleMatchDurationMinutes, Discipline(id, name), Category(id, name, gender), TournamentTeam(id), Match(id)")
       .order("createdAt", { ascending: false });
 
     if (q) query = query.ilike("name", `%${q}%`);
@@ -26,7 +27,13 @@ export async function GET(request: NextRequest) {
           id: t.id,
           name: t.name,
           format: t.format,
-          status: t.status,
+          status: deriveTournamentStatus({
+            teamCount: Array.isArray(t.TournamentTeam) ? t.TournamentTeam.length : 0,
+            matchCount: Array.isArray(t.Match) ? t.Match.length : 0,
+            format: t.format,
+            status: t.status,
+          }),
+          schedulingRules: schedulingRulesFromRow(t),
           discipline: { id: disc?.id ?? "", name: disc?.name ?? "" },
           category: { id: cat?.id ?? "", name: cat?.name ?? "", gender: cat?.gender ?? "" },
           teamsCount: Array.isArray(t.TournamentTeam) ? t.TournamentTeam.length : 0,
@@ -56,8 +63,8 @@ export async function POST(request: NextRequest) {
 
     const { data, error } = await supabase
       .from("Tournament")
-      .insert({ id: crypto.randomUUID(), name, disciplineId, categoryId })
-      .select("id, name, format, status, createdAt, updatedAt, Discipline(id, name), Category(id, name, gender)")
+      .insert({ id: crypto.randomUUID(), name, disciplineId, categoryId, ...schedulingRulesToRow(DEFAULT_SCHEDULING_RULES) })
+      .select("id, name, format, status, createdAt, updatedAt, scheduleStartDate, scheduleEndDate, scheduleMatchesPerMatchday, scheduleAllowedWeekdays, scheduleDailyStartTime, scheduleDailyEndTime, scheduleMatchDurationMinutes, Discipline(id, name), Category(id, name, gender)")
       .single();
 
     if (error) throw error;
@@ -70,6 +77,7 @@ export async function POST(request: NextRequest) {
         name: data.name,
         format: data.format,
         status: data.status,
+        schedulingRules: schedulingRulesFromRow(data),
         discipline: { id: disc?.id ?? "", name: disc?.name ?? "" },
         category: { id: cat?.id ?? "", name: cat?.name ?? "", gender: cat?.gender ?? "" },
         createdAt: data.createdAt,

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { deriveTournamentStatus } from "@/lib/tournamentLifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     if (!teamId) return NextResponse.json({ error: "teamId es requerido" }, { status: 400 });
 
+    const [{ data: tournament }, { data: matches }] = await Promise.all([
+      supabase.from("Tournament").select("id, format, status").eq("id", id).single(),
+      supabase.from("Match").select("id").eq("tournamentId", id).limit(1),
+    ]);
+
+    if (!tournament) {
+      return NextResponse.json({ error: "Torneo no encontrado" }, { status: 404 });
+    }
+
+    if ((matches ?? []).length > 0) {
+      return NextResponse.json({ error: "No puedes modificar equipos cuando el fixture ya fue generado" }, { status: 409 });
+    }
+
     const { data, error } = await supabase
       .from("TournamentTeam")
       .insert({ id: crypto.randomUUID(), tournamentId: id, teamId })
@@ -54,6 +68,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .single();
 
     if (error) throw error;
+
+    const { count: teamCount } = await supabase
+      .from("TournamentTeam")
+      .select("id", { count: "exact", head: true })
+      .eq("tournamentId", id);
+
+    await supabase
+      .from("Tournament")
+      .update({
+        status: deriveTournamentStatus({
+          teamCount: teamCount ?? 0,
+          matchCount: 0,
+          format: tournament.format,
+          status: tournament.status,
+        }),
+      })
+      .eq("id", id);
 
     const t = data.Team as unknown as { id: string; name: string; establishmentId: string; createdAt: string; updatedAt: string; Establishment: { id: string; name: string; comuna: string | null } | null } | null;
     return NextResponse.json(

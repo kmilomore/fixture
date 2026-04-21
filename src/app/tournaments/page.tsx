@@ -2,6 +2,7 @@ import { Trophy, CalendarDays, ExternalLink, Settings2 } from "lucide-react";
 import { NewTournamentForm, DeleteTournamentButton } from "./Components";
 import Link from "next/link";
 import { fetchServerApi } from "@/lib/serverApi";
+import { getTournamentStatusPresentation, type TournamentStatus } from "@/lib/tournamentLifecycle";
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +11,7 @@ export default async function TournamentsPage() {
     id: string;
     name: string;
     format: string | null;
-    status: string;
+    status: TournamentStatus;
     discipline: { id: string; name: string };
     category: { id: string; name: string; gender: string };
     teamsCount: number;
@@ -49,12 +50,20 @@ export default async function TournamentsPage() {
         {tournaments.map((t) => (
           <Link href={`/tournaments/${t.id}`} key={t.id} className="block group">
             <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm group-hover:shadow-md transition-all group-hover:border-emerald-300 relative">
+              {(() => {
+                const statusPresentation = getTournamentStatusPresentation(t.status);
+                return (
+                  <span className={`absolute left-5 top-4 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-widest ${statusPresentation.className}`}>
+                    {statusPresentation.label}
+                  </span>
+                );
+              })()}
               
               <div className="absolute top-4 right-4 z-10">
                 <DeleteTournamentButton id={t.id} />
               </div>
 
-              <div className="flex items-start gap-4 mb-3">
+              <div className="mb-3 flex items-start gap-4 pt-8">
                  <div className="p-3 bg-emerald-50 rounded-xl">
                     <Trophy className="w-8 h-8 text-emerald-500" />
                  </div>

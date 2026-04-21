@@ -44,6 +44,13 @@ CREATE TABLE IF NOT EXISTS public."Tournament" (
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "format" TEXT,
   "status" TEXT NOT NULL DEFAULT 'DRAFT',
+  "scheduleStartDate" DATE,
+  "scheduleEndDate" DATE,
+  "scheduleMatchesPerMatchday" INTEGER,
+  "scheduleAllowedWeekdays" INTEGER[],
+  "scheduleDailyStartTime" TEXT,
+  "scheduleDailyEndTime" TEXT,
+  "scheduleMatchDurationMinutes" INTEGER,
   CONSTRAINT "Tournament_categoryId_fkey"
     FOREIGN KEY ("categoryId")
     REFERENCES public."Category"("id")

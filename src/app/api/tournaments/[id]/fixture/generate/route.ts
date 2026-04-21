@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
 import { generateFixtureMatches, type FixtureGenerationOptions } from "@/lib/fixtureEngine";
+import { schedulingRulesToRow } from "@/lib/tournamentLifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +50,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const { error: updateError } = await supabase
       .from("Tournament")
-      .update({ status: "PLAYING", format: options.format })
+      .update({ status: "SCHEDULED", format: options.format, ...schedulingRulesToRow(options.schedulingRules) })
       .eq("id", id);
     if (updateError) throw updateError;
 

@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import {
+  canTransitionTournamentStatus,
+  deriveTournamentStatus,
+  isTournamentStatus,
+  schedulingRulesFromRow,
+  schedulingRulesToRow,
+} from "@/lib/tournamentLifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +19,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       await Promise.all([
         supabase
           .from("Tournament")
-          .select("id, name, format, status, createdAt, updatedAt, Discipline(id, name), Category(id, name, gender)")
+          .select("id, name, format, status, createdAt, updatedAt, scheduleStartDate, scheduleEndDate, scheduleMatchesPerMatchday, scheduleAllowedWeekdays, scheduleDailyStartTime, scheduleDailyEndTime, scheduleMatchDurationMinutes, Discipline(id, name), Category(id, name, gender)")
           .eq("id", id)
           .single(),
         supabase
@@ -57,7 +64,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       id: tournament.id,
       name: tournament.name,
       format: tournament.format,
-      status: tournament.status,
+      status: deriveTournamentStatus({
+        teamCount: (teams ?? []).length,
+        matchCount: (matches ?? []).length,
+        finishedMatchCount: (matches ?? []).filter((match) => match.isFinished).length,
+        format: tournament.format,
+        status: tournament.status,
+      }),
+      schedulingRules: schedulingRulesFromRow(tournament),
       createdAt: tournament.createdAt,
       updatedAt: tournament.updatedAt,
       discipline: { id: disc?.id ?? "", name: disc?.name ?? "" },
@@ -109,12 +123,45 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { id } = await params;
     const body = await request.json();
 
+    const [{ data: currentTournament }, { count: teamCount }, { count: matchCount }, { count: finishedMatchCount }] = await Promise.all([
+      supabase.from("Tournament").select("id, format, status").eq("id", id).single(),
+      supabase.from("TournamentTeam").select("id", { count: "exact", head: true }).eq("tournamentId", id),
+      supabase.from("Match").select("id", { count: "exact", head: true }).eq("tournamentId", id),
+      supabase.from("Match").select("id", { count: "exact", head: true }).eq("tournamentId", id).eq("isFinished", true),
+    ]);
+
+    if (!currentTournament) {
+      return NextResponse.json({ error: "Torneo no encontrado" }, { status: 404 });
+    }
+
+    const currentStatus = deriveTournamentStatus({
+      teamCount: teamCount ?? 0,
+      matchCount: matchCount ?? 0,
+      finishedMatchCount: finishedMatchCount ?? 0,
+      format: currentTournament.format,
+      status: currentTournament.status,
+    });
+
     const updateData: Record<string, unknown> = {};
     if (typeof body.name === "string" && body.name.trim()) updateData.name = body.name.trim();
     if (typeof body.disciplineId === "string" && body.disciplineId.trim()) updateData.disciplineId = body.disciplineId.trim();
     if (typeof body.categoryId === "string" && body.categoryId.trim()) updateData.categoryId = body.categoryId.trim();
-    if (typeof body.status === "string" && body.status.trim()) updateData.status = body.status.trim();
     if (body.format === null || typeof body.format === "string") updateData.format = body.format;
+    if (body.schedulingRules && typeof body.schedulingRules === "object") {
+      Object.assign(updateData, schedulingRulesToRow(body.schedulingRules));
+    }
+
+    if (body.status !== undefined) {
+      if (!isTournamentStatus(body.status)) {
+        return NextResponse.json({ error: "Estado de torneo inválido" }, { status: 400 });
+      }
+
+      if (!canTransitionTournamentStatus(currentStatus, body.status)) {
+        return NextResponse.json({ error: `Transición inválida: ${currentStatus} -> ${body.status}` }, { status: 409 });
+      }
+
+      updateData.status = body.status;
+    }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "No hay cambios para aplicar" }, { status: 400 });
@@ -124,7 +171,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .from("Tournament")
       .update(updateData)
       .eq("id", id)
-      .select("id, name, format, status, createdAt, updatedAt, Discipline(id, name), Category(id, name, gender)")
+      .select("id, name, format, status, createdAt, updatedAt, scheduleStartDate, scheduleEndDate, scheduleMatchesPerMatchday, scheduleAllowedWeekdays, scheduleDailyStartTime, scheduleDailyEndTime, scheduleMatchDurationMinutes, Discipline(id, name), Category(id, name, gender)")
       .single();
 
     if (error || !data) return NextResponse.json({ error: "Torneo no encontrado" }, { status: 404 });
@@ -135,7 +182,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       id: data.id,
       name: data.name,
       format: data.format,
-      status: data.status,
+      status: deriveTournamentStatus({
+        teamCount: teamCount ?? 0,
+        matchCount: matchCount ?? 0,
+        finishedMatchCount: finishedMatchCount ?? 0,
+        format: data.format,
+        status: data.status,
+      }),
+      schedulingRules: schedulingRulesFromRow(data),
       discipline: { id: disc?.id ?? "", name: disc?.name ?? "" },
       category: { id: cat?.id ?? "", name: cat?.name ?? "", gender: cat?.gender ?? "" },
       createdAt: data.createdAt,

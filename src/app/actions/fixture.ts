@@ -3,12 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { type FixtureFormat, type FixtureGenerationOptions } from "@/lib/fixtureEngine";
 import { requestServerApi } from "@/lib/serverApi";
+import type { FixtureSchedulingRules } from "@/lib/fixtureEngine";
 
-export async function setTournamentFormat(tournamentId: string, format: FixtureFormat) {
+export async function setTournamentFormat(
+  tournamentId: string,
+  format: FixtureFormat,
+  schedulingRules?: FixtureSchedulingRules
+) {
   try {
     const response = await requestServerApi<{ id: string }>(`/api/tournaments/${tournamentId}/fixture/format`, {
       method: "PUT",
-      body: JSON.stringify({ format }),
+      body: JSON.stringify({ format, schedulingRules }),
     });
 
     if (!response.ok) {
