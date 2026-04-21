@@ -2,10 +2,21 @@ import { Trophy, Users, Building2, Activity } from "lucide-react";
 import prisma from "@/lib/prisma";
 
 export default async function DashboardPage() {
-  // Fetch basic stats
-  const establishmentsCount = await prisma.establishment.count();
-  const teamsCount = await prisma.team.count();
-  const tournamentsCount = await prisma.tournament.count();
+  let establishmentsCount = 0;
+  let teamsCount = 0;
+  let tournamentsCount = 0;
+  let dataUnavailable = false;
+
+  try {
+    [establishmentsCount, teamsCount, tournamentsCount] = await Promise.all([
+      prisma.establishment.count(),
+      prisma.team.count(),
+      prisma.tournament.count(),
+    ]);
+  } catch (error) {
+    dataUnavailable = true;
+    console.error("Dashboard stats unavailable:", error);
+  }
   
   const stats = [
     { name: 'Establecimientos', value: establishmentsCount, icon: Building2, color: 'text-blue-500', bg: 'bg-blue-100' },
@@ -19,6 +30,11 @@ export default async function DashboardPage() {
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-slate-800">Dashboard General</h2>
         <p className="text-slate-500 mt-1">Resumen operativo del sistema web de fixtures.</p>
+        {dataUnavailable ? (
+          <p className="text-amber-600 mt-2 text-sm">
+            La base de datos todavia no responde con la estructura esperada. La app sigue disponible mientras terminas la configuracion.
+          </p>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

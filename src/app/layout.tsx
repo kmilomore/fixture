@@ -19,8 +19,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  await ensureDefaultCatalogsLoaded();
-  await ensureDefaultEstablishmentsLoaded();
+  try {
+    await ensureDefaultCatalogsLoaded();
+    await ensureDefaultEstablishmentsLoaded();
+  } catch (error) {
+    console.error("Startup sync failed:", error);
+  }
 
   return (
     <html lang="es">
