@@ -489,18 +489,25 @@ function MatchRow({
   const [dt, setDt] = useState(
     match.date ? new Date(match.date).toISOString().slice(0, 16) : ""
   );
+  const requiresScore = status === "FINISHED" || status === "WALKOVER";
 
   function handleSave() {
     startTransition(async () => {
-      await updateMatchResult(tournamentId, match.id, {
-        homeScore: Number(hs),
-        awayScore: Number(as_),
+      const result = await updateMatchResult(tournamentId, match.id, {
+        homeScore: requiresScore && hs !== "" ? Number(hs) : undefined,
+        awayScore: requiresScore && as_ !== "" ? Number(as_) : undefined,
         location: loc,
         date: dt,
         status,
         incidentType: incidentType || null,
         incidentNotes,
       });
+
+      if (result.error) {
+        alert(result.error);
+        return;
+      }
+
       onCancelEdit();
     });
   }
@@ -590,11 +597,11 @@ function MatchRow({
           </div>
           <div>
             <label className="text-xs text-slate-500 font-medium block mb-1">Marcador Local</label>
-            <input type="number" min="0" value={hs} onChange={(e) => setHs(e.target.value)} className="w-full border rounded-md px-2 py-1.5 text-sm bg-white" />
+            <input type="number" min="0" value={hs} onChange={(e) => setHs(e.target.value)} disabled={!requiresScore} className="w-full border rounded-md px-2 py-1.5 text-sm bg-white disabled:bg-slate-100 disabled:text-slate-400" />
           </div>
           <div>
             <label className="text-xs text-slate-500 font-medium block mb-1">Marcador Visita</label>
-            <input type="number" min="0" value={as_} onChange={(e) => setAs(e.target.value)} className="w-full border rounded-md px-2 py-1.5 text-sm bg-white" />
+            <input type="number" min="0" value={as_} onChange={(e) => setAs(e.target.value)} disabled={!requiresScore} className="w-full border rounded-md px-2 py-1.5 text-sm bg-white disabled:bg-slate-100 disabled:text-slate-400" />
           </div>
           <div>
             <label className="text-xs text-slate-500 font-medium block mb-1">Fecha y Hora</label>
@@ -608,6 +615,11 @@ function MatchRow({
             <label className="text-xs text-slate-500 font-medium block mb-1">Notas de incidencia</label>
             <textarea value={incidentNotes} onChange={(e) => setIncidentNotes(e.target.value)} rows={2} className="w-full border rounded-md px-2 py-1.5 text-sm bg-white" placeholder="Detalle breve si hubo suspensión, protesta, abandono o reprogramación" />
           </div>
+          {!requiresScore && (
+            <p className="col-span-2 text-xs text-slate-500">
+              El marcador solo se guarda cuando el partido está en estado Finalizado o Walkover.
+            </p>
+          )}
           <div className="col-span-2 flex justify-end gap-2 mt-1">
             <button onClick={onCancelEdit} className="text-sm px-3 py-1.5 bg-slate-200 hover:bg-slate-300 rounded-lg text-slate-600">Cancelar</button>
             <button onClick={handleSave} disabled={isPending} className="text-sm px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium">

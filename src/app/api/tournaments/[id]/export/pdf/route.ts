@@ -96,8 +96,16 @@ export async function GET(
         drawText(page, match.phaseLabel.slice(0, 16), PAGE_WIDTH - PAGE_MARGIN - 85, cursorY - 11, 8, boldFont, rgb(0.2, 0.25, 0.31));
       }
 
+      drawText(page, `Estado: ${match.statusLabel}`.slice(0, 24), PAGE_WIDTH - PAGE_MARGIN - 130, cursorY - 28, 8, regularFont, rgb(0.39, 0.45, 0.55));
+      if (match.incidentLabel) {
+        drawText(page, `Incidencia: ${match.incidentLabel}`.slice(0, 26), PAGE_WIDTH - PAGE_MARGIN - 130, cursorY - 38, 8, regularFont, rgb(0.55, 0.35, 0.08));
+      }
+
       drawText(page, `Fecha: ${match.dateLabel}`.slice(0, 42), PAGE_MARGIN + 12, cursorY - 28, 8, regularFont, rgb(0.39, 0.45, 0.55));
       drawText(page, `Lugar: ${match.location}`.slice(0, 40), PAGE_MARGIN + 260, cursorY - 28, 8, regularFont, rgb(0.39, 0.45, 0.55));
+      if (match.incidentNotes) {
+        drawText(page, `Nota: ${match.incidentNotes}`.slice(0, 72), PAGE_MARGIN + 12, cursorY - 38, 8, regularFont, rgb(0.45, 0.33, 0.1));
+      }
       cursorY -= 50;
     }
 

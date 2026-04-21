@@ -71,8 +71,8 @@ export async function updateMatchResult(
   tournamentId: string,
   matchId: string,
   payload: {
-    homeScore: number;
-    awayScore: number;
+    homeScore?: number;
+    awayScore?: number;
     location?: string;
     date?: string;
     status: MatchStatus;
@@ -96,14 +96,14 @@ export async function updateMatchResult(
     });
 
     if (!response.ok) {
-      return { error: (response.body as { error?: string } | null)?.error ?? "Error al actualizar resultado" };
+      return { error: (response.body as { error?: string } | null)?.error ?? "Error al actualizar el partido" };
     }
 
     revalidatePath(`/tournaments/${tournamentId}`);
     revalidatePath("/tournaments");
     return { success: true };
   } catch {
-    return { error: "Error al actualizar resultado" };
+    return { error: "Error al actualizar el partido" };
   }
 }
 

@@ -1,4 +1,6 @@
 import postgres from "@/lib/postgres";
+import type { MatchIncidentType, MatchStatus } from "@/lib/matchLifecycle";
+import { getMatchIncidentLabel, getMatchStatusPresentation } from "@/lib/matchLifecycle";
 
 type ExportMatch = {
   id: string;
@@ -9,6 +11,10 @@ type ExportMatch = {
   location: string;
   dateLabel: string;
   isFinished: boolean;
+  status: MatchStatus;
+  statusLabel: string;
+  incidentLabel: string | null;
+  incidentNotes: string | null;
 };
 
 type ExportGroup = {
@@ -111,10 +117,13 @@ export async function getTournamentFixtureExportData(tournamentId: string): Prom
       homeScore: number | null;
       awayScore: number | null;
       isFinished: boolean;
+      status: MatchStatus;
+      incidentType: MatchIncidentType | null;
+      incidentNotes: string | null;
       homeTeamName: string | null;
       awayTeamName: string | null;
     }>(
-      `SELECT m."id", m."round", m."groupName", m."matchLogicIdentifier", m."date", m."location", m."homeScore", m."awayScore", m."isFinished",
+      `SELECT m."id", m."round", m."groupName", m."matchLogicIdentifier", m."date", m."location", m."homeScore", m."awayScore", m."isFinished", m."status", m."incidentType", m."incidentNotes",
          ht."name" AS "homeTeamName",
          at."name" AS "awayTeamName"
        FROM public."Match" m
@@ -148,6 +157,10 @@ export async function getTournamentFixtureExportData(tournamentId: string): Prom
       location: match.location ?? "Por definir",
       dateLabel: formatDateLabel(match.date),
       isFinished: match.isFinished,
+      status: match.status,
+      statusLabel: getMatchStatusPresentation(match.status).label,
+      incidentLabel: match.incidentType ? getMatchIncidentLabel(match.incidentType) : null,
+      incidentNotes: match.incidentNotes,
     });
 
     groupsMap.set(groupTitle, groupMatches);

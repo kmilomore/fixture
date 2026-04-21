@@ -1,6 +1,10 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import {
   getMatchIncidentLabel,
   getMatchStatusPresentation,
+  MATCH_STATUSES,
   type MatchIncidentType,
   type MatchStatus,
 } from "@/lib/matchLifecycle";
@@ -42,7 +46,41 @@ function getTeamLabel(team: CalendarMatch["homeTeam"]) {
 }
 
 export function CalendarView({ matches }: { matches: CalendarMatch[] }) {
-  const orderedMatches = [...matches].sort((left, right) => {
+  const [statusFilter, setStatusFilter] = useState<MatchStatus | "ALL">("ALL");
+  const [locationFilter, setLocationFilter] = useState("ALL");
+  const [dayFilter, setDayFilter] = useState("ALL");
+
+  const locationOptions = useMemo(
+    () => Array.from(new Set(matches.map((match) => match.location?.trim()).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b, "es")),
+    [matches]
+  );
+
+  const dayOptions = useMemo(
+    () => Array.from(new Set(matches.map((match) => match.date ? new Date(match.date).toISOString().slice(0, 10) : "NO_DATE"))),
+    [matches]
+  );
+
+  const filteredMatches = useMemo(
+    () => matches.filter((match) => {
+      if (statusFilter !== "ALL" && match.status !== statusFilter) {
+        return false;
+      }
+
+      if (locationFilter !== "ALL" && (match.location?.trim() || "") !== locationFilter) {
+        return false;
+      }
+
+      const matchDay = match.date ? new Date(match.date).toISOString().slice(0, 10) : "NO_DATE";
+      if (dayFilter !== "ALL" && matchDay !== dayFilter) {
+        return false;
+      }
+
+      return true;
+    }),
+    [matches, statusFilter, locationFilter, dayFilter]
+  );
+
+  const orderedMatches = [...filteredMatches].sort((left, right) => {
     if (!left.date && !right.date) return 0;
     if (!left.date) return 1;
     if (!right.date) return -1;
@@ -61,6 +99,40 @@ export function CalendarView({ matches }: { matches: CalendarMatch[] }) {
 
   return (
     <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="grid gap-3 md:grid-cols-3">
+          <label className="text-sm text-slate-600">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Estado</span>
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as MatchStatus | "ALL")} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-500">
+              <option value="ALL">Todos</option>
+              {MATCH_STATUSES.map((status) => (
+                <option key={status} value={status}>{getMatchStatusPresentation(status).label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm text-slate-600">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Sede / Lugar</span>
+            <select value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-500">
+              <option value="ALL">Todos</option>
+              {locationOptions.map((location) => (
+                <option key={location} value={location}>{location}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm text-slate-600">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Día</span>
+            <select value={dayFilter} onChange={(event) => setDayFilter(event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-500">
+              <option value="ALL">Todos</option>
+              {dayOptions.map((day) => (
+                <option key={day} value={day}>
+                  {day === "NO_DATE" ? "Sin fecha" : new Intl.DateTimeFormat("es-CL", { dateStyle: "full" }).format(new Date(`${day}T00:00:00`))}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </div>
+
       {Object.entries(groupedMatches).map(([dayLabel, dayMatches]) => (
         <section key={dayLabel} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
@@ -109,9 +181,9 @@ export function CalendarView({ matches }: { matches: CalendarMatch[] }) {
         </section>
       ))}
 
-      {matches.length === 0 && (
+      {filteredMatches.length === 0 && (
         <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">
-          El calendario aparecerá aquí una vez que el torneo tenga partidos generados.
+          No hay partidos que coincidan con los filtros actuales.
         </div>
       )}
     </div>

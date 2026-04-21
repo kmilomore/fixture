@@ -3,6 +3,10 @@ import { getSupabase } from "@/lib/supabase";
 import { deriveTournamentStatus } from "@/lib/tournamentLifecycle";
 import { isFinishedMatchStatus, isMatchIncidentType, isMatchStatus } from "@/lib/matchLifecycle";
 
+function isNonNegativeInteger(value: unknown) {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
 export const dynamic = "force-dynamic";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -26,11 +30,38 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Tipo de incidencia inválido" }, { status: 400 });
     }
 
+    const requiresScore = nextStatus === "FINISHED" || nextStatus === "WALKOVER";
+    const providedScore = body.homeScore !== undefined || body.awayScore !== undefined;
+
+    if (requiresScore) {
+      if (!isNonNegativeInteger(body.homeScore) || !isNonNegativeInteger(body.awayScore)) {
+        return NextResponse.json({ error: "Debes informar marcador válido para partidos finalizados o walkover" }, { status: 400 });
+      }
+    } else if (providedScore) {
+      return NextResponse.json({ error: "Solo puedes registrar marcador cuando el partido está en FINISHED o WALKOVER" }, { status: 400 });
+    }
+
+    if (nextIncidentType && typeof body.incidentNotes !== "string") {
+      return NextResponse.json({ error: "Las incidencias deben incluir una nota descriptiva" }, { status: 400 });
+    }
+
+    if (nextIncidentType && !body.incidentNotes.trim()) {
+      return NextResponse.json({ error: "Las incidencias deben incluir una nota descriptiva" }, { status: 400 });
+    }
+
+    if (!nextIncidentType && body.incidentNotes && typeof body.incidentNotes === "string" && body.incidentNotes.trim()) {
+      return NextResponse.json({ error: "No puedes guardar notas de incidencia sin un tipo de incidencia" }, { status: 400 });
+    }
+
     const updateData: Record<string, unknown> = {
       isFinished: typeof body.isFinished === "boolean" ? body.isFinished : nextStatus ? isFinishedMatchStatus(nextStatus) : true,
     };
-    if (typeof body.homeScore === "number") updateData.homeScore = body.homeScore;
-    if (typeof body.awayScore === "number") updateData.awayScore = body.awayScore;
+    if (requiresScore && isNonNegativeInteger(body.homeScore)) updateData.homeScore = body.homeScore;
+    if (requiresScore && isNonNegativeInteger(body.awayScore)) updateData.awayScore = body.awayScore;
+    if (!requiresScore && nextStatus) {
+      updateData.homeScore = null;
+      updateData.awayScore = null;
+    }
     if (typeof body.location === "string") updateData.location = body.location.trim() || null;
     if (body.date !== undefined) updateData.date = body.date === null ? null : body.date;
     if (nextStatus) updateData.status = nextStatus;
