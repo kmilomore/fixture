@@ -1,125 +1,84 @@
 import { NextRequest, NextResponse } from "next/server";
-import postgres from "@/lib/postgres";
+import { getSupabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";
+    const supabase = getSupabase();
+    const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
 
-    const tournaments = await postgres.query<{
-      id: string;
-      name: string;
-      format: string | null;
-      status: string;
-      createdAt: Date;
-      updatedAt: Date;
-      disciplineId: string;
-      disciplineName: string;
-      categoryId: string;
-      categoryName: string;
-      categoryGender: string;
-      teamsCount: number;
-      matchesCount: number;
-    }>(
-      `SELECT
-        t."id", t."name", t."format", t."status", t."createdAt", t."updatedAt",
-        d."id" AS "disciplineId", d."name" AS "disciplineName",
-        c."id" AS "categoryId", c."name" AS "categoryName", c."gender" AS "categoryGender",
-        COUNT(DISTINCT tt."id")::int AS "teamsCount",
-        COUNT(DISTINCT m."id")::int AS "matchesCount"
-      FROM public."Tournament" t
-      INNER JOIN public."Discipline" d ON d."id" = t."disciplineId"
-      INNER JOIN public."Category" c ON c."id" = t."categoryId"
-      LEFT JOIN public."TournamentTeam" tt ON tt."tournamentId" = t."id"
-      LEFT JOIN public."Match" m ON m."tournamentId" = t."id"
-      WHERE ($1 = '' OR t."name" ILIKE '%' || $1 || '%')
-      GROUP BY t."id", d."id", c."id"
-      ORDER BY t."createdAt" DESC`,
-      [query]
-    );
+    let query = supabase
+      .from("Tournament")
+      .select("id, name, format, status, createdAt, updatedAt, Discipline(id, name), Category(id, name, gender), TournamentTeam(id), Match(id)")
+      .order("createdAt", { ascending: false });
+
+    if (q) query = query.ilike("name", `%${q}%`);
+
+    const { data, error } = await query;
+    if (error) throw error;
 
     return NextResponse.json(
-      tournaments.rows.map((tournament) => ({
-        id: tournament.id,
-        name: tournament.name,
-        format: tournament.format,
-        status: tournament.status,
-        discipline: { id: tournament.disciplineId, name: tournament.disciplineName },
-        category: { id: tournament.categoryId, name: tournament.categoryName, gender: tournament.categoryGender },
-        teamsCount: tournament.teamsCount,
-        matchesCount: tournament.matchesCount,
-        createdAt: tournament.createdAt.toISOString(),
-        updatedAt: tournament.updatedAt.toISOString(),
-      }))
+      (data ?? []).map((t) => {
+        const disc = t.Discipline as unknown as { id: string; name: string } | null;
+        const cat = t.Category as unknown as { id: string; name: string; gender: string } | null;
+        return {
+          id: t.id,
+          name: t.name,
+          format: t.format,
+          status: t.status,
+          discipline: { id: disc?.id ?? "", name: disc?.name ?? "" },
+          category: { id: cat?.id ?? "", name: cat?.name ?? "", gender: cat?.gender ?? "" },
+          teamsCount: Array.isArray(t.TournamentTeam) ? t.TournamentTeam.length : 0,
+          matchesCount: Array.isArray(t.Match) ? t.Match.length : 0,
+          createdAt: t.createdAt,
+          updatedAt: t.updatedAt,
+        };
+      })
     );
   } catch (error) {
     console.error("GET /api/tournaments failed:", error);
-    return NextResponse.json(
-      { error: "No se pudieron consultar los torneos" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "No se pudieron consultar los torneos" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabase();
     const body = await request.json();
     const name = typeof body.name === "string" ? body.name.trim() : "";
     const disciplineId = typeof body.disciplineId === "string" ? body.disciplineId.trim() : "";
     const categoryId = typeof body.categoryId === "string" ? body.categoryId.trim() : "";
 
     if (!name || !disciplineId || !categoryId) {
-      return NextResponse.json(
-        { error: "Nombre, disciplina y categoria son obligatorios" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Nombre, disciplina y categoria son obligatorios" }, { status: 400 });
     }
 
-    const tournament = await postgres.query<{
-      id: string;
-      name: string;
-      format: string | null;
-      status: string;
-      createdAt: Date;
-      updatedAt: Date;
-      disciplineId: string;
-      disciplineName: string;
-      categoryId: string;
-      categoryName: string;
-      categoryGender: string;
-    }>(
-      `INSERT INTO public."Tournament" ("id", "name", "disciplineId", "categoryId")
-       VALUES ($1, $2, $3, $4)
-       RETURNING "id", "name", "format", "status", "createdAt", "updatedAt",
-         "disciplineId" AS "disciplineId",
-         (SELECT d."name" FROM public."Discipline" d WHERE d."id" = $3) AS "disciplineName",
-         "categoryId" AS "categoryId",
-         (SELECT c."name" FROM public."Category" c WHERE c."id" = $4) AS "categoryName",
-         (SELECT c."gender" FROM public."Category" c WHERE c."id" = $4) AS "categoryGender"`,
-      [crypto.randomUUID(), name, disciplineId, categoryId]
-    );
+    const { data, error } = await supabase
+      .from("Tournament")
+      .insert({ id: crypto.randomUUID(), name, disciplineId, categoryId })
+      .select("id, name, format, status, createdAt, updatedAt, Discipline(id, name), Category(id, name, gender)")
+      .single();
 
-    const row = tournament.rows[0];
+    if (error) throw error;
 
+    const disc = data.Discipline as unknown as { id: string; name: string } | null;
+    const cat = data.Category as unknown as { id: string; name: string; gender: string } | null;
     return NextResponse.json(
       {
-        id: row.id,
-        name: row.name,
-        format: row.format,
-        status: row.status,
-        discipline: { id: row.disciplineId, name: row.disciplineName },
-        category: { id: row.categoryId, name: row.categoryName, gender: row.categoryGender },
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
+        id: data.id,
+        name: data.name,
+        format: data.format,
+        status: data.status,
+        discipline: { id: disc?.id ?? "", name: disc?.name ?? "" },
+        category: { id: cat?.id ?? "", name: cat?.name ?? "", gender: cat?.gender ?? "" },
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
       },
       { status: 201 }
     );
   } catch (error) {
     console.error("POST /api/tournaments failed:", error);
-    return NextResponse.json(
-      { error: "No se pudo crear el torneo" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "No se pudo crear el torneo" }, { status: 500 });
   }
 }

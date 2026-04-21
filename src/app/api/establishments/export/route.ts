@@ -1,34 +1,24 @@
 import Papa from "papaparse";
 import { NextResponse } from "next/server";
-import postgres from "@/lib/postgres";
+import { getSupabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const establishments = await postgres.query<{
-    id: string;
-    name: string;
-    comuna: string | null;
-    teamsCount: number;
-    createdAt: Date;
-    updatedAt: Date;
-  }>(
-    `SELECT e."id", e."name", e."comuna", e."createdAt", e."updatedAt",
-       COUNT(t."id")::int AS "teamsCount"
-     FROM public."Establishment" e
-     LEFT JOIN public."Team" t ON t."establishmentId" = e."id"
-     GROUP BY e."id"
-     ORDER BY e."name" ASC`
-  );
+  const supabase = getSupabase();
+  const { data } = await supabase
+    .from("Establishment")
+    .select("id, name, comuna, createdAt, updatedAt, Team(id)")
+    .order("name", { ascending: true });
 
   const csv = Papa.unparse(
-    establishments.rows.map((establishment) => ({
-      id: establishment.id,
-      nombre: establishment.name,
-      comuna: establishment.comuna ?? "",
-      equipos: establishment.teamsCount,
-      creado_en: establishment.createdAt.toISOString(),
-      actualizado_en: establishment.updatedAt.toISOString(),
+    (data ?? []).map((e) => ({
+      id: e.id,
+      nombre: e.name,
+      comuna: e.comuna ?? "",
+      equipos: Array.isArray(e.Team) ? e.Team.length : 0,
+      creado_en: e.createdAt,
+      actualizado_en: e.updatedAt,
     }))
   );
 

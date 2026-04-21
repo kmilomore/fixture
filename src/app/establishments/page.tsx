@@ -9,13 +9,16 @@ import { fetchServerApi } from "@/lib/serverApi";
 export const dynamic = 'force-dynamic';
 
 export default async function EstablishmentsPage() {
-  const tableRows = await fetchServerApi<Array<{
+  let tableRows: Array<{
     id: string;
     name: string;
     comuna: string | null;
     createdAt: string;
     teamsCount: number;
-  }>>("/api/establishments");
+  }> = [];
+  try {
+    tableRows = await fetchServerApi("/api/establishments");
+  } catch {}
 
   return (
     <div className="space-y-6 max-w-5xl">

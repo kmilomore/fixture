@@ -1,59 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
-import postgres from "@/lib/postgres";
+import { getSupabase } from "@/lib/supabase";
 import { normalizeComuna, normalizeEstablishmentName } from "@/lib/establishments";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";
+    const supabase = getSupabase();
+    const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
     const comuna = request.nextUrl.searchParams.get("comuna")?.trim() ?? "";
 
-    const establishments = await postgres.query<{
-      id: string;
-      name: string;
-      comuna: string | null;
-      createdAt: Date;
-      updatedAt: Date;
-      teamsCount: number;
-    }>(
-      `SELECT
-        e."id",
-        e."name",
-        e."comuna",
-        e."createdAt",
-        e."updatedAt",
-        COUNT(t."id")::int AS "teamsCount"
-      FROM public."Establishment" e
-      LEFT JOIN public."Team" t ON t."establishmentId" = e."id"
-      WHERE ($1 = '' OR e."name" ILIKE '%' || $1 || '%')
-        AND ($2 = '' OR COALESCE(e."comuna", '') ILIKE $2)
-      GROUP BY e."id", e."name", e."comuna", e."createdAt", e."updatedAt"
-      ORDER BY e."name" ASC`,
-      [query, comuna]
-    );
+    let query = supabase
+      .from("Establishment")
+      .select("id, name, comuna, createdAt, updatedAt, Team(id)")
+      .order("name", { ascending: true });
+
+    if (q) query = query.ilike("name", `%${q}%`);
+    if (comuna) query = query.ilike("comuna", comuna);
+
+    const { data, error } = await query;
+    if (error) throw error;
 
     return NextResponse.json(
-      establishments.rows.map((establishment) => ({
-        id: establishment.id,
-        name: establishment.name,
-        comuna: establishment.comuna,
-        teamsCount: establishment.teamsCount,
-        createdAt: establishment.createdAt.toISOString(),
-        updatedAt: establishment.updatedAt.toISOString(),
+      (data ?? []).map((e) => ({
+        id: e.id,
+        name: e.name,
+        comuna: e.comuna,
+        teamsCount: Array.isArray(e.Team) ? e.Team.length : 0,
+        createdAt: e.createdAt,
+        updatedAt: e.updatedAt,
       }))
     );
   } catch (error) {
     console.error("GET /api/establishments failed:", error);
-    return NextResponse.json(
-      { error: "No se pudieron consultar los establecimientos" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "No se pudieron consultar los establecimientos" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabase();
     const body = await request.json();
     const name = typeof body.name === "string" ? body.name.trim() : "";
     const comuna = normalizeComuna(body.comuna);
@@ -63,45 +49,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "El nombre es requerido" }, { status: 400 });
     }
 
-    const existing = await postgres.query<{ name: string }>('SELECT "name" FROM public."Establishment"');
-    if (existing.rows.some((row) => normalizeEstablishmentName(row.name) === normalizeEstablishmentName(name))) {
+    const { data: existing } = await supabase.from("Establishment").select("name");
+    if ((existing ?? []).some((r) => normalizeEstablishmentName(r.name) === normalizeEstablishmentName(name))) {
       return NextResponse.json({ error: "El establecimiento ya existe" }, { status: 409 });
     }
 
     const establishmentId = crypto.randomUUID();
-    const establishment = await postgres.query<{
-      id: string;
-      name: string;
-      comuna: string | null;
-      logoUrl: string | null;
-      createdAt: Date;
-      updatedAt: Date;
-    }>(
-      'INSERT INTO public."Establishment" ("id", "name", "comuna", "logoUrl") VALUES ($1, $2, $3, $4) RETURNING "id", "name", "comuna", "logoUrl", "createdAt", "updatedAt"',
-      [establishmentId, name, comuna, logoUrl]
-    );
-    await postgres.query(
-      'INSERT INTO public."Team" ("id", "name", "establishmentId") VALUES ($1, $2, $3)',
-      [crypto.randomUUID(), name, establishmentId]
-    );
+    const { data, error } = await supabase
+      .from("Establishment")
+      .insert({ id: establishmentId, name, comuna, logoUrl })
+      .select()
+      .single();
 
-    const row = establishment.rows[0];
-    return NextResponse.json(
-      {
-        id: row.id,
-        name: row.name,
-        comuna: row.comuna,
-        logoUrl: row.logoUrl,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
-      },
-      { status: 201 }
-    );
+    if (error) throw error;
+
+    await supabase.from("Team").insert({ id: crypto.randomUUID(), name, establishmentId });
+
+    return NextResponse.json(data, { status: 201 });
   } catch (error) {
     console.error("POST /api/establishments failed:", error);
-    return NextResponse.json(
-      { error: "No se pudo crear el establecimiento" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "No se pudo crear el establecimiento" }, { status: 500 });
   }
 }

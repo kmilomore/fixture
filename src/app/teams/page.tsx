@@ -5,24 +5,28 @@ import { fetchServerApi } from "@/lib/serverApi";
 export const dynamic = 'force-dynamic';
 
 export default async function TeamsPage() {
-  const [teams, establishments] = await Promise.all([
-    fetchServerApi<Array<{
-      id: string;
-      name: string;
-      establishmentId: string;
-      establishment: { id: string; name: string; comuna: string | null };
-      createdAt: string;
-      updatedAt: string;
-    }>>("/api/teams"),
-    fetchServerApi<Array<{
-      id: string;
-      name: string;
-      comuna: string | null;
-      teamsCount: number;
-      createdAt: string;
-      updatedAt: string;
-    }>>("/api/establishments"),
-  ]);
+  let teams: Array<{
+    id: string;
+    name: string;
+    establishmentId: string;
+    establishment: { id: string; name: string; comuna: string | null };
+    createdAt: string;
+    updatedAt: string;
+  }> = [];
+  let establishments: Array<{
+    id: string;
+    name: string;
+    comuna: string | null;
+    teamsCount: number;
+    createdAt: string;
+    updatedAt: string;
+  }> = [];
+  try {
+    [teams, establishments] = await Promise.all([
+      fetchServerApi<typeof teams>("/api/teams"),
+      fetchServerApi<typeof establishments>("/api/establishments"),
+    ]);
+  } catch {}
 
   return (
     <div className="space-y-6 max-w-5xl">

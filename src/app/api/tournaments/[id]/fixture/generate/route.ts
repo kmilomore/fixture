@@ -1,84 +1,61 @@
 import { NextResponse } from "next/server";
-import postgres from "@/lib/postgres";
-import {
-  generateFixtureMatches,
-  type FixtureGenerationOptions,
-} from "@/lib/fixtureEngine";
+import { getSupabase } from "@/lib/supabase";
+import { generateFixtureMatches, type FixtureGenerationOptions } from "@/lib/fixtureEngine";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const supabase = getSupabase();
     const { id } = await params;
     const options = (await request.json()) as FixtureGenerationOptions;
 
-    const [tournament, teams, matches] = await Promise.all([
-      postgres.query<{ id: string }>('SELECT "id" FROM public."Tournament" WHERE "id" = $1', [id]),
-      postgres.query<{ id: string; name: string }>(
-        `SELECT t."id", t."name"
-         FROM public."TournamentTeam" tt
-         INNER JOIN public."Team" t ON t."id" = tt."teamId"
-         WHERE tt."tournamentId" = $1`,
-        [id]
-      ),
-      postgres.query<{ id: string }>('SELECT "id" FROM public."Match" WHERE "tournamentId" = $1', [id]),
+    const [{ data: tournament }, { data: teams }, { data: matches }] = await Promise.all([
+      supabase.from("Tournament").select("id").eq("id", id).single(),
+      supabase.from("TournamentTeam").select("teamId, Team(id, name)").eq("tournamentId", id),
+      supabase.from("Match").select("id").eq("tournamentId", id),
     ]);
 
-    if (tournament.rowCount === 0) {
-      return NextResponse.json({ error: "Torneo no encontrado" }, { status: 404 });
+    if (!tournament) return NextResponse.json({ error: "Torneo no encontrado" }, { status: 404 });
+    if (!options.format) return NextResponse.json({ error: "Debes seleccionar el formato primero" }, { status: 400 });
+
+    const teamRows = (teams ?? []).map((entry) => {
+      const t = entry.Team as unknown as { id: string; name: string } | null;
+      return { id: t?.id ?? entry.teamId, name: t?.name ?? "" };
+    });
+
+    if (teamRows.length < 2) {
+      return NextResponse.json({ error: "Necesitas al menos 2 equipos para generar el fixture" }, { status: 400 });
+    }
+    if ((matches ?? []).length > 0) {
+      return NextResponse.json({ error: "Este torneo ya tiene partidos generados" }, { status: 409 });
     }
 
-    if (!options.format) {
-      return NextResponse.json({ error: "Debes seleccionar el formato primero" }, { status: 400 });
-    }
+    const fixtureMatches = generateFixtureMatches(teamRows, options);
 
-    if (teams.rows.length < 2) {
-      return NextResponse.json(
-        { error: "Necesitas al menos 2 equipos para generar el fixture" },
-        { status: 400 }
-      );
-    }
+    const matchInserts = fixtureMatches.map((match) => ({
+      id: crypto.randomUUID(),
+      tournamentId: id,
+      homeTeamId: match.homeTeamId,
+      awayTeamId: match.awayTeamId,
+      round: match.round,
+      groupName: match.groupName,
+      matchLogicIdentifier: match.matchLogicIdentifier,
+      date: match.date ?? null,
+    }));
 
-    if (matches.rows.length > 0) {
-      return NextResponse.json(
-        { error: "Este torneo ya tiene partidos generados" },
-        { status: 409 }
-      );
-    }
+    const { error: insertError } = await supabase.from("Match").insert(matchInserts);
+    if (insertError) throw insertError;
 
-    const fixtureMatches = generateFixtureMatches(teams.rows, options);
-
-    for (const match of fixtureMatches) {
-      await postgres.query(
-        `INSERT INTO public."Match" ("id", "tournamentId", "homeTeamId", "awayTeamId", "round", "groupName", "matchLogicIdentifier", "date")
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [
-          crypto.randomUUID(),
-          id,
-          match.homeTeamId,
-          match.awayTeamId,
-          match.round,
-          match.groupName,
-          match.matchLogicIdentifier,
-          match.date ?? null,
-        ]
-      );
-    }
-
-    await postgres.query(
-      'UPDATE public."Tournament" SET "status" = $2, "format" = $3 WHERE "id" = $1',
-      [id, "PLAYING", options.format]
-    );
+    const { error: updateError } = await supabase
+      .from("Tournament")
+      .update({ status: "PLAYING", format: options.format })
+      .eq("id", id);
+    if (updateError) throw updateError;
 
     return NextResponse.json({ success: true, count: fixtureMatches.length });
   } catch (error) {
     console.error("POST /api/tournaments/[id]/fixture/generate failed:", error);
-    return NextResponse.json(
-      { error: "No se pudo generar el fixture" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "No se pudo generar el fixture" }, { status: 500 });
   }
 }

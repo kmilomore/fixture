@@ -6,12 +6,13 @@ import { fetchServerApi } from "@/lib/serverApi";
 export const dynamic = 'force-dynamic';
 
 export default async function DisciplinesPage() {
-  const data = await fetchServerApi<{
-    disciplines: Array<{ id: string; name: string; createdAt: string; updatedAt: string }>;
-    categories: Array<{ id: string; name: string; gender: string; createdAt: string; updatedAt: string }>;
-  }>("/api/disciplines");
-  const disciplines = data.disciplines;
-  const categories = data.categories;
+  let disciplines: Array<{ id: string; name: string; createdAt: string; updatedAt: string }> = [];
+  let categories: Array<{ id: string; name: string; gender: string; createdAt: string; updatedAt: string }> = [];
+  try {
+    const data = await fetchServerApi<{ disciplines: typeof disciplines; categories: typeof categories }>("/api/disciplines");
+    disciplines = data.disciplines;
+    categories = data.categories;
+  } catch {}
 
   return (
     <div className="space-y-8 max-w-5xl">

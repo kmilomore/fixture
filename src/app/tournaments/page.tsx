@@ -6,27 +6,29 @@ import { fetchServerApi } from "@/lib/serverApi";
 export const dynamic = 'force-dynamic';
 
 export default async function TournamentsPage() {
-  const [tournaments, catalogData] = await Promise.all([
-    fetchServerApi<Array<{
-      id: string;
-      name: string;
-      format: string | null;
-      status: string;
-      discipline: { id: string; name: string };
-      category: { id: string; name: string; gender: string };
-      teamsCount: number;
-      matchesCount: number;
-      createdAt: string;
-      updatedAt: string;
-    }>>("/api/tournaments"),
-    fetchServerApi<{
-      disciplines: Array<{ id: string; name: string; createdAt: string; updatedAt: string }>;
-      categories: Array<{ id: string; name: string; gender: string; createdAt: string; updatedAt: string }>;
-    }>("/api/disciplines"),
-  ]);
-
-  const disciplines = catalogData.disciplines;
-  const categories = catalogData.categories;
+  let tournaments: Array<{
+    id: string;
+    name: string;
+    format: string | null;
+    status: string;
+    discipline: { id: string; name: string };
+    category: { id: string; name: string; gender: string };
+    teamsCount: number;
+    matchesCount: number;
+    createdAt: string;
+    updatedAt: string;
+  }> = [];
+  let disciplines: Array<{ id: string; name: string; createdAt: string; updatedAt: string }> = [];
+  let categories: Array<{ id: string; name: string; gender: string; createdAt: string; updatedAt: string }> = [];
+  try {
+    const [tournamentsData, catalogData] = await Promise.all([
+      fetchServerApi<typeof tournaments>("/api/tournaments"),
+      fetchServerApi<{ disciplines: typeof disciplines; categories: typeof categories }>("/api/disciplines"),
+    ]);
+    tournaments = tournamentsData;
+    disciplines = catalogData.disciplines;
+    categories = catalogData.categories;
+  } catch {}
 
   return (
     <div className="space-y-6 max-w-6xl">

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(psql \"postgresql://postgres:Alonsito.2019@db.vlwdwipenvqgnolfyjep.supabase.co:5432/postgres\" -f \"scripts/phppgadmin-schema.sql\")",
+      "Bash(npm run *)"
+    ]
+  }
+}
