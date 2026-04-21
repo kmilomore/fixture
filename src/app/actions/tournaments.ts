@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requestServerApi } from "@/lib/serverApi";
+import type { TournamentStatus } from "@/lib/tournamentLifecycle";
 
 export async function createTournament(formData: FormData) {
   const name = formData.get("name") as string;
@@ -81,4 +82,24 @@ export async function removeTeamFromTournament(id: string, tournamentId: string)
     } catch {
         return { error: "Error al quitar equipo." };
     }
+}
+
+export async function updateTournamentStatus(tournamentId: string, status: TournamentStatus) {
+  try {
+    const response = await requestServerApi<{ id: string; status: TournamentStatus }>(`/api/tournaments/${tournamentId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+
+    if (!response.ok) {
+      return { error: (response.body as { error?: string } | null)?.error ?? "Error al actualizar el estado del torneo" };
+    }
+
+    revalidatePath(`/tournaments/${tournamentId}`);
+    revalidatePath("/tournaments");
+    revalidatePath("/");
+    return { success: true };
+  } catch {
+    return { error: "Error al actualizar el estado del torneo" };
+  }
 }

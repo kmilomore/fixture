@@ -2,7 +2,12 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { ChevronDown, Plus, Search, Trash2 } from "lucide-react";
-import { addTeamToTournament, removeTeamFromTournament } from "../../actions/tournaments";
+import { addTeamToTournament, removeTeamFromTournament, updateTournamentStatus } from "../../actions/tournaments";
+import {
+  getAllowedTournamentStatusTransitions,
+  getTournamentStatusLabel,
+  type TournamentStatus,
+} from "@/lib/tournamentLifecycle";
 
 function normalizeSearchValue(value: string) {
   return value
@@ -10,6 +15,63 @@ function normalizeSearchValue(value: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+}
+
+export function TournamentStatusControls({
+  tournamentId,
+  currentStatus,
+}: {
+  tournamentId: string;
+  currentStatus: TournamentStatus;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [selectedStatus, setSelectedStatus] = useState<TournamentStatus>(currentStatus);
+  const availableTransitions = getAllowedTournamentStatusTransitions(currentStatus);
+
+  const handleStatusChange = (nextStatus: TournamentStatus) => {
+    if (nextStatus === currentStatus) {
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await updateTournamentStatus(tournamentId, nextStatus);
+      if (result.error) {
+        alert(result.error);
+        setSelectedStatus(currentStatus);
+      }
+    });
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+      <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-500">Control de estado</h4>
+      <div className="space-y-3">
+        <p className="text-sm text-slate-600">
+          Estado actual: <span className="font-semibold text-slate-800">{getTournamentStatusLabel(currentStatus)}</span>
+        </p>
+        <select
+          value={selectedStatus}
+          disabled={isPending}
+          onChange={(event) => {
+            const nextStatus = event.target.value as TournamentStatus;
+            setSelectedStatus(nextStatus);
+            handleStatusChange(nextStatus);
+          }}
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-500 disabled:opacity-60"
+        >
+          <option value={currentStatus}>{getTournamentStatusLabel(currentStatus)}</option>
+          {availableTransitions.map((status) => (
+            <option key={status} value={status}>
+              {getTournamentStatusLabel(status)}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-slate-500">
+          Solo se muestran transiciones válidas para el estado actual del torneo.
+        </p>
+      </div>
+    </div>
+  );
 }
 
 export function ManageTournamentTeams({

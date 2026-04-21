@@ -140,6 +140,14 @@ export function canTransitionTournamentStatus(from: TournamentStatus, to: Tourna
   return from === to || ALLOWED_STATUS_TRANSITIONS[from].includes(to);
 }
 
+export function getAllowedTournamentStatusTransitions(status: TournamentStatus) {
+  return ALLOWED_STATUS_TRANSITIONS[status];
+}
+
+export function getTournamentStatusLabel(status: TournamentStatus) {
+  return getTournamentStatusPresentation(status).label;
+}
+
 export function getTournamentStatusPresentation(status: TournamentStatus) {
   switch (status) {
     case "READY":

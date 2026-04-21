@@ -1,7 +1,7 @@
 import { Trophy, Settings, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ManageTournamentTeams } from "./ClientComponents";
+import { ManageTournamentTeams, TournamentStatusControls } from "./ClientComponents";
 import { FixtureEngine } from "./FixtureEngine";
 import { fetchServerApi } from "@/lib/serverApi";
 import { getTournamentStatusPresentation, type TournamentStatus } from "@/lib/tournamentLifecycle";
@@ -193,6 +193,7 @@ export default async function TournamentDetailsPage({
                 <p>Calendario: <span className="font-semibold text-slate-800">{tournament.schedulingRules.startDate} a {tournament.schedulingRules.endDate}</span></p>
               </div>
             </div>
+            <TournamentStatusControls tournamentId={tournament.id} currentStatus={tournament.status} />
           </div>
           <div className="lg:col-span-2 min-w-0 space-y-4">
             <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
