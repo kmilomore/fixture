@@ -21,6 +21,7 @@ Este módulo administra la vida completa de un torneo:
 - `page.tsx`
   - Lista torneos existentes.
   - Obtiene disciplinas y categorías para el formulario de alta.
+  - Si la carga del listado falla, muestra una advertencia visible en vez de quedar silenciosamente vacía.
 
 - `Components.tsx`
   - `NewTournamentForm`
@@ -40,6 +41,14 @@ Este módulo administra la vida completa de un torneo:
 - `[id]/FixtureEngine.tsx`
   - configurador y visualización del fixture.
 
+- `../api/tournaments/route.ts`
+  - listado y alta HTTP de torneos.
+  - incorpora fallback entre esquema nuevo y esquema legado si todavía faltan columnas de calendarización.
+
+- `../api/tournaments/[id]/route.ts`
+  - detalle, edición y baja HTTP de un torneo.
+  - incorpora fallback para cargar torneos y partidos aunque la base aún no tenga todas las columnas nuevas.
+
 ## Flujos de trabajo
 
 ### Creación de torneo
@@ -48,6 +57,7 @@ Este módulo administra la vida completa de un torneo:
 2. Indica nombre, disciplina y categoría.
 3. Si faltan catálogos, la UI bloquea la creación.
 4. La server action crea el torneo y revalida dashboard y listado.
+5. Si la base todavía no tiene columnas nuevas de scheduling, el alta puede seguir operando por la ruta de compatibilidad legada.
 
 ### Gestión de equipos dentro del torneo
 
@@ -88,8 +98,16 @@ Este módulo administra la vida completa de un torneo:
 2. Si corresponde, se define cantidad de grupos.
 3. Se define el calendario disponible: rango de fechas, días y franja horaria.
 4. Se generan partidos y se les asignan slots automáticamente.
-5. El estado del torneo cambia a `PLAYING`.
+5. El estado del torneo cambia a `SCHEDULED` cuando el fixture se genera; luego puede pasar a `PLAYING`, `PAUSED`, `FINISHED` o `CANCELLED` según el avance real.
 6. Desde ese punto la UI ya no muestra la edición de inscripciones sino el listado de participantes y el motor del fixture.
+
+## Compatibilidad y resiliencia
+
+- El listado y el detalle de torneos toleran esquemas de base parcialmente migrados.
+- Si faltan columnas nuevas como las de scheduling, las rutas API retroceden a un `select` legado en vez de romper toda la pantalla.
+- Esta compatibilidad evita inconsistencias donde el dashboard cuenta filas existentes pero el módulo de torneos no puede renderizarlas por error de consulta.
+- La pantalla de `/tournaments` ya no oculta errores de carga con un `catch {}` vacío: ahora deja una señal visible para diagnóstico.
+- En el dashboard se corrigió el texto del indicador de torneos: el valor mostrado representa torneos registrados, no necesariamente torneos activos.
 
 ## APIs y acciones disponibles
 
@@ -141,3 +159,4 @@ Acciones relacionadas desde el motor de fixture:
 - El comportamiento correcto de esta sección depende de mantener el selector como componente controlado.
 - El módulo ya no solo crea torneos: ahora también resuelve la calendarización operativa del fixture.
 - La API HTTP permite desacoplar frontend, automatizaciones o clientes externos del acceso directo a PostgreSQL.
+- Una falla silenciosa en el listado puede ocultar torneos existentes aunque el dashboard los siga contando; por eso el módulo ahora prioriza degradación controlada y mensajes visibles.
