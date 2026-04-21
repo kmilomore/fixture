@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { type FixtureFormat, type FixtureGenerationOptions } from "@/lib/fixtureEngine";
 import { requestServerApi } from "@/lib/serverApi";
 import type { FixtureSchedulingRules } from "@/lib/fixtureEngine";
+import type { MatchIncidentType, MatchStatus } from "@/lib/matchLifecycle";
 
 export async function setTournamentFormat(
   tournamentId: string,
@@ -66,16 +67,31 @@ export async function resetFixture(tournamentId: string) {
   }
 }
 
-export async function updateMatchResult(matchId: string, homeScore: number, awayScore: number, location?: string, date?: string) {
+export async function updateMatchResult(
+  tournamentId: string,
+  matchId: string,
+  payload: {
+    homeScore: number;
+    awayScore: number;
+    location?: string;
+    date?: string;
+    status: MatchStatus;
+    incidentType?: MatchIncidentType | null;
+    incidentNotes?: string | null;
+  }
+) {
   try {
     const response = await requestServerApi<{ id: string }>(`/api/matches/${matchId}`, {
       method: "PATCH",
       body: JSON.stringify({
-        homeScore,
-        awayScore,
-        isFinished: true,
-        location: location || null,
-        date: date ? new Date(date) : null,
+        homeScore: payload.homeScore,
+        awayScore: payload.awayScore,
+        status: payload.status,
+        isFinished: payload.status === "FINISHED" || payload.status === "WALKOVER",
+        location: payload.location || null,
+        date: payload.date ? new Date(payload.date) : null,
+        incidentType: payload.incidentType ?? null,
+        incidentNotes: payload.incidentNotes ?? null,
       }),
     });
 
@@ -83,6 +99,7 @@ export async function updateMatchResult(matchId: string, homeScore: number, away
       return { error: (response.body as { error?: string } | null)?.error ?? "Error al actualizar resultado" };
     }
 
+    revalidatePath(`/tournaments/${tournamentId}`);
     revalidatePath("/tournaments");
     return { success: true };
   } catch {

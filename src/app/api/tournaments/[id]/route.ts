@@ -28,7 +28,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           .eq("tournamentId", id),
         supabase
           .from("Match")
-          .select("id, tournamentId, homeTeamId, awayTeamId, date, location, homeScore, awayScore, isFinished, round, groupName, matchLogicIdentifier, createdAt, updatedAt")
+          .select("id, tournamentId, homeTeamId, awayTeamId, date, location, homeScore, awayScore, isFinished, status, incidentType, incidentNotes, round, groupName, matchLogicIdentifier, createdAt, updatedAt")
           .eq("tournamentId", id)
           .order("round", { ascending: true, nullsFirst: false })
           .order("createdAt", { ascending: true }),
@@ -102,6 +102,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         homeScore: m.homeScore,
         awayScore: m.awayScore,
         isFinished: m.isFinished,
+        status: m.status,
+        incidentType: m.incidentType,
+        incidentNotes: m.incidentNotes,
         round: m.round,
         groupName: m.groupName,
         matchLogicIdentifier: m.matchLogicIdentifier,

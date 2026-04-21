@@ -3,9 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ManageTournamentTeams, TournamentStatusControls } from "./ClientComponents";
 import { FixtureEngine } from "./FixtureEngine";
+import { CalendarView } from "./CalendarView";
 import { fetchServerApi } from "@/lib/serverApi";
 import { getTournamentStatusPresentation, type TournamentStatus } from "@/lib/tournamentLifecycle";
 import type { FixtureSchedulingRules } from "@/lib/fixtureEngine";
+import type { MatchIncidentType, MatchStatus } from "@/lib/matchLifecycle";
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +15,7 @@ const DETAIL_TABS = [
   { id: "overview", label: "Resumen" },
   { id: "teams", label: "Equipos" },
   { id: "fixture", label: "Fixture" },
+  { id: "calendar", label: "Calendario" },
 ] as const;
 
 type DetailTab = (typeof DETAIL_TABS)[number]["id"];
@@ -87,6 +90,9 @@ export default async function TournamentDetailsPage({
       homeScore: number | null;
       awayScore: number | null;
       isFinished: boolean;
+      status: MatchStatus;
+      incidentType: MatchIncidentType | null;
+      incidentNotes: string | null;
       round: number | null;
       groupName: string | null;
       matchLogicIdentifier: string | null;
@@ -264,6 +270,23 @@ export default async function TournamentDetailsPage({
           </div>
           <div className="lg:col-span-2 min-w-0">
             <FixtureEngine tournament={serializedTournament} />
+          </div>
+        </div>
+      )}
+
+      {activeTab === "calendar" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="space-y-4 lg:col-span-1 min-w-0">
+            <TournamentSummaryCard tournament={tournament} />
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+              <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-500">Vista calendario</h4>
+              <p className="text-sm text-slate-600">
+                Ordena los partidos por día y hora real para operar sedes, mesas y reprogramaciones sin depender del agrupamiento deportivo.
+              </p>
+            </div>
+          </div>
+          <div className="lg:col-span-2 min-w-0">
+            <CalendarView matches={serializedTournament.matches} />
           </div>
         </div>
       )}

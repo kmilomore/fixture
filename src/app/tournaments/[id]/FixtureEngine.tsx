@@ -10,6 +10,14 @@ import {
   type FixtureGenerationOptions,
   type FixtureSchedulingRules,
 } from "@/lib/fixtureEngine";
+import {
+  getMatchIncidentLabel,
+  getMatchStatusPresentation,
+  MATCH_INCIDENT_TYPES,
+  MATCH_STATUSES,
+  type MatchIncidentType,
+  type MatchStatus,
+} from "@/lib/matchLifecycle";
 import { DEFAULT_SCHEDULING_RULES, type TournamentStatus } from "@/lib/tournamentLifecycle";
 
 type Team = { id: string; name: string; establishment: { name: string } };
@@ -23,6 +31,9 @@ type MatchWithTeams = {
   homeScore: number | null;
   awayScore: number | null;
   isFinished: boolean;
+  status: MatchStatus;
+  incidentType: MatchIncidentType | null;
+  incidentNotes: string | null;
   homeTeam: Team | null;
   awayTeam: Team | null;
 };
@@ -398,6 +409,7 @@ export function FixtureEngine({ tournament }: Props) {
           {Object.entries(matchesByGroup).map(([groupKey, groupMatches]) => (
             <MatchGroup
               key={groupKey}
+              tournamentId={tournament.id}
               groupKey={groupKey}
               matches={groupMatches}
               format={tournament.format}
@@ -413,12 +425,14 @@ export function FixtureEngine({ tournament }: Props) {
 
 
 function MatchGroup({
+  tournamentId,
   groupKey,
   matches,
   format,
   editingMatch,
   setEditingMatch,
 }: {
+  tournamentId: string;
   groupKey: string;
   matches: MatchWithTeams[];
   format: string | null;
@@ -439,6 +453,7 @@ function MatchGroup({
         {matches.map((m) => (
           <MatchRow
             key={m.id}
+            tournamentId={tournamentId}
             match={m}
             isEditing={editingMatch === m.id}
             onEdit={() => setEditingMatch(m.id)}
@@ -452,11 +467,13 @@ function MatchGroup({
 
 
 function MatchRow({
+  tournamentId,
   match,
   isEditing,
   onEdit,
   onCancelEdit,
 }: {
+  tournamentId: string;
   match: MatchWithTeams;
   isEditing: boolean;
   onEdit: () => void;
@@ -466,13 +483,24 @@ function MatchRow({
   const [hs, setHs] = useState(match.homeScore?.toString() ?? "");
   const [as_, setAs] = useState(match.awayScore?.toString() ?? "");
   const [loc, setLoc] = useState(match.location ?? "");
+  const [status, setStatus] = useState<MatchStatus>(match.status);
+  const [incidentType, setIncidentType] = useState<MatchIncidentType | "">(match.incidentType ?? "");
+  const [incidentNotes, setIncidentNotes] = useState(match.incidentNotes ?? "");
   const [dt, setDt] = useState(
     match.date ? new Date(match.date).toISOString().slice(0, 16) : ""
   );
 
   function handleSave() {
     startTransition(async () => {
-      await updateMatchResult(match.id, Number(hs), Number(as_), loc, dt);
+      await updateMatchResult(tournamentId, match.id, {
+        homeScore: Number(hs),
+        awayScore: Number(as_),
+        location: loc,
+        date: dt,
+        status,
+        incidentType: incidentType || null,
+        incidentNotes,
+      });
       onCancelEdit();
     });
   }
@@ -485,14 +513,23 @@ function MatchRow({
   const matchdayLabel = match.matchLogicIdentifier && !match.matchLogicIdentifier.includes(" vs ")
     ? match.matchLogicIdentifier
     : null;
+  const statusPresentation = getMatchStatusPresentation(match.status);
 
   return (
     <li className={`px-4 py-3 ${isBye && !isPlaceholderMatch ? "bg-slate-50 opacity-60" : ""}`}>
-      {matchdayLabel && (
-        <div className="mb-2 flex items-center gap-2">
+      {(matchdayLabel || match.incidentType || match.status) && (
+        <div className="mb-2 flex items-center gap-2 flex-wrap">
           <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-            {matchdayLabel}
+            {matchdayLabel ?? "Partido"}
           </span>
+          <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${statusPresentation.className}`}>
+            {statusPresentation.label}
+          </span>
+          {match.incidentType && (
+            <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+              {getMatchIncidentLabel(match.incidentType)}
+            </span>
+          )}
         </div>
       )}
       {/* Teams row */}
@@ -523,16 +560,34 @@ function MatchRow({
       </div>
 
       {/* Meta info */}
-      {(match.date || match.location) && !isEditing && (
+      {(match.date || match.location || match.incidentNotes) && !isEditing && (
         <div className="flex gap-3 mt-1 pl-1 text-xs text-slate-400">
           {match.date && <span>📅 {new Date(match.date).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" })}</span>}
           {match.location && <span>📍 {match.location}</span>}
+          {match.incidentNotes && <span>📝 {match.incidentNotes}</span>}
         </div>
       )}
 
       {/* Inline edit form */}
       {isEditing && (
         <div className="mt-3 bg-slate-50 rounded-lg p-4 border border-slate-200 grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-slate-500 font-medium block mb-1">Estado</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value as MatchStatus)} className="w-full border rounded-md px-2 py-1.5 text-sm bg-white">
+              {MATCH_STATUSES.map((value) => (
+                <option key={value} value={value}>{getMatchStatusPresentation(value).label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 font-medium block mb-1">Incidencia</label>
+            <select value={incidentType} onChange={(e) => setIncidentType(e.target.value as MatchIncidentType | "")} className="w-full border rounded-md px-2 py-1.5 text-sm bg-white">
+              <option value="">Sin incidencia</option>
+              {MATCH_INCIDENT_TYPES.map((value) => (
+                <option key={value} value={value}>{getMatchIncidentLabel(value)}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="text-xs text-slate-500 font-medium block mb-1">Marcador Local</label>
             <input type="number" min="0" value={hs} onChange={(e) => setHs(e.target.value)} className="w-full border rounded-md px-2 py-1.5 text-sm bg-white" />
@@ -548,6 +603,10 @@ function MatchRow({
           <div>
             <label className="text-xs text-slate-500 font-medium block mb-1">Cancha / Lugar</label>
             <input type="text" placeholder="Ej: Estadio Municipal" value={loc} onChange={(e) => setLoc(e.target.value)} className="w-full border rounded-md px-2 py-1.5 text-sm bg-white" />
+          </div>
+          <div className="col-span-2">
+            <label className="text-xs text-slate-500 font-medium block mb-1">Notas de incidencia</label>
+            <textarea value={incidentNotes} onChange={(e) => setIncidentNotes(e.target.value)} rows={2} className="w-full border rounded-md px-2 py-1.5 text-sm bg-white" placeholder="Detalle breve si hubo suspensión, protesta, abandono o reprogramación" />
           </div>
           <div className="col-span-2 flex justify-end gap-2 mt-1">
             <button onClick={onCancelEdit} className="text-sm px-3 py-1.5 bg-slate-200 hover:bg-slate-300 rounded-lg text-slate-600">Cancelar</button>
