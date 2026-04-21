@@ -1,0 +1,85 @@
+{
+  "name": "programa-fixture",
+  "version": "1.0.0",
+  "description": "Sistema web de gestión y generación de fixtures deportivos",
+  "main": "electron/main.js",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack",
+    "postinstall": "prisma generate",
+    "prebuild": "prisma generate",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "electron": "electron .",
+    "electron-dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
+    "dist": "npm run build && electron-builder",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:sync": "prisma db push && prisma generate",
+    "generate:phppgadmin-sql": "node scripts/generate-phppgadmin-import.mjs",
+    "import:all": "node scripts/import-all-prisma.mjs",
+    "vercel-build": "prisma generate && next build",
+    "repair:establishments": "node scripts/repair-establishments.mjs"
+  },
+  "dependencies": {
+    "@prisma/client": "5.22.0",
+    "exceljs": "^4.4.0",
+    "lucide-react": "0.460.0",
+    "next": "16.2.4",
+    "papaparse": "5.4.1",
+    "pdf-lib": "^1.17.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/papaparse": "5.3.14",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "concurrently": "^8.2.2",
+    "electron": "^33.0.0",
+    "electron-builder": "^24.0.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.4",
+    "prisma": "5.22.0",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "cl.edu.fixture-pro",
+    "productName": "Fixture Pro",
+    "directories": {
+      "output": "dist-app"
+    },
+    "files": [
+      "electron/**/*",
+      ".next/**/*",
+      "public/**/*",
+      "prisma/**/*",
+      "node_modules/**/*",
+      "package.json",
+      "next.config.ts"
+    ],
+    "extraResources": [
+      {
+        "from": "prisma",
+        "to": "app/prisma"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Fixture Pro"
+    }
+  }
+}

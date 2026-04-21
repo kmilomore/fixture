@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Establishment {
+  id        String   @id @default(cuid())
+  name      String
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  comuna    String?
+  teams     Team[]
+}
+
+model Discipline {
+  id          String       @id @default(cuid())
+  name        String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  tournaments Tournament[]
+}
+
+model Category {
+  id          String       @id @default(cuid())
+  name        String
+  gender      String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  tournaments Tournament[]
+}
+
+model Team {
+  id              String           @id @default(cuid())
+  name            String
+  establishmentId String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  awayMatches     Match[]          @relation("AwayTeam")
+  homeMatches     Match[]          @relation("HomeTeam")
+  establishment   Establishment    @relation(fields: [establishmentId], references: [id])
+  tournamentTeams TournamentTeam[]
+}
+
+model Tournament {
+  id           String           @id @default(cuid())
+  name         String
+  disciplineId String
+  categoryId   String
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  format       String?
+  status       String           @default("DRAFT")
+  matches      Match[]
+  category     Category         @relation(fields: [categoryId], references: [id])
+  discipline   Discipline       @relation(fields: [disciplineId], references: [id])
+  teams        TournamentTeam[]
+}
+
+model TournamentTeam {
+  id           String     @id @default(cuid())
+  tournamentId String
+  teamId       String
+  team         Team       @relation(fields: [teamId], references: [id])
+  tournament   Tournament @relation(fields: [tournamentId], references: [id])
+
+  @@unique([tournamentId, teamId])
+}
+
+model Match {
+  id                   String     @id @default(cuid())
+  tournamentId         String
+  homeTeamId           String?
+  awayTeamId           String?
+  date                 DateTime?
+  location             String?
+  homeScore            Int?
+  awayScore            Int?
+  isFinished           Boolean    @default(false)
+  round                Int?
+  groupName            String?
+  matchLogicIdentifier String?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+  awayTeam             Team?      @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  homeTeam             Team?      @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  tournament           Tournament @relation(fields: [tournamentId], references: [id])
+}
