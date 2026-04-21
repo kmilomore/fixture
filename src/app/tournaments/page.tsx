@@ -21,6 +21,7 @@ export default async function TournamentsPage() {
   }> = [];
   let disciplines: Array<{ id: string; name: string; createdAt: string; updatedAt: string }> = [];
   let categories: Array<{ id: string; name: string; gender: string; createdAt: string; updatedAt: string }> = [];
+  let loadError = false;
   try {
     const [tournamentsData, catalogData] = await Promise.all([
       fetchServerApi<typeof tournaments>("/api/tournaments"),
@@ -29,7 +30,10 @@ export default async function TournamentsPage() {
     tournaments = tournamentsData;
     disciplines = catalogData.disciplines;
     categories = catalogData.categories;
-  } catch {}
+  } catch (error) {
+    loadError = true;
+    console.error("Tournament list unavailable:", error);
+  }
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -42,6 +46,11 @@ export default async function TournamentsPage() {
           <p className="text-slate-500 mt-1">
             Crea torneos definiendo disciplina y categoría, y comienza a armar tu fixture.
           </p>
+          {loadError ? (
+            <p className="mt-2 text-sm text-amber-600">
+              No se pudo cargar el listado de torneos. Si el dashboard muestra torneos pero aquí no aparecen, revisa que la base tenga aplicadas las migraciones nuevas del módulo de torneos.
+            </p>
+          ) : null}
         </div>
         <NewTournamentForm disciplines={disciplines} categories={categories} />
       </div>

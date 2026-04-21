@@ -10,16 +10,37 @@ import {
 
 export const dynamic = "force-dynamic";
 
+const TOURNAMENT_DETAIL_SELECT = "id, name, format, status, createdAt, updatedAt, scheduleStartDate, scheduleEndDate, scheduleMatchesPerMatchday, scheduleAllowedWeekdays, scheduleDailyStartTime, scheduleDailyEndTime, scheduleMatchDurationMinutes, Discipline(id, name), Category(id, name, gender)";
+const TOURNAMENT_DETAIL_LEGACY_SELECT = "id, name, format, status, createdAt, updatedAt, Discipline(id, name), Category(id, name, gender)";
+const MATCH_DETAIL_SELECT = "id, tournamentId, homeTeamId, awayTeamId, date, location, homeScore, awayScore, isFinished, status, incidentType, incidentNotes, round, groupName, matchLogicIdentifier, createdAt, updatedAt";
+const MATCH_DETAIL_LEGACY_SELECT = "id, tournamentId, homeTeamId, awayTeamId, date, location, homeScore, awayScore, isFinished, round, groupName, matchLogicIdentifier, createdAt, updatedAt";
+
+function hasMissingTournamentColumns(error: unknown) {
+  if (!error || typeof error !== "object" || !("message" in error)) {
+    return false;
+  }
+
+  const message = String(error.message).toLowerCase();
+  return (
+    message.includes("schedulestartdate") ||
+    message.includes("scheduleenddate") ||
+    message.includes("schedulematchespermatchday") ||
+    message.includes("incidenttype") ||
+    message.includes("incidentnotes") ||
+    message.includes("status")
+  );
+}
+
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const supabase = getSupabase();
     const { id } = await params;
 
-    const [{ data: tournament, error: e1 }, { data: teams, error: e2 }, { data: matches, error: e3 }] =
-      await Promise.all([
+    const fetchTournamentBundle = async (useLegacy = false) =>
+      Promise.all([
         supabase
           .from("Tournament")
-          .select("id, name, format, status, createdAt, updatedAt, scheduleStartDate, scheduleEndDate, scheduleMatchesPerMatchday, scheduleAllowedWeekdays, scheduleDailyStartTime, scheduleDailyEndTime, scheduleMatchDurationMinutes, Discipline(id, name), Category(id, name, gender)")
+          .select(useLegacy ? TOURNAMENT_DETAIL_LEGACY_SELECT : TOURNAMENT_DETAIL_SELECT)
           .eq("id", id)
           .single(),
         supabase
@@ -28,18 +49,62 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           .eq("tournamentId", id),
         supabase
           .from("Match")
-          .select("id, tournamentId, homeTeamId, awayTeamId, date, location, homeScore, awayScore, isFinished, status, incidentType, incidentNotes, round, groupName, matchLogicIdentifier, createdAt, updatedAt")
+          .select(useLegacy ? MATCH_DETAIL_LEGACY_SELECT : MATCH_DETAIL_SELECT)
           .eq("tournamentId", id)
           .order("round", { ascending: true, nullsFirst: false })
           .order("createdAt", { ascending: true }),
       ]);
 
+    let [{ data: tournament, error: e1 }, { data: teams, error: e2 }, { data: matches, error: e3 }] = await fetchTournamentBundle();
+
+    if ((e1 && hasMissingTournamentColumns(e1)) || (e3 && hasMissingTournamentColumns(e3))) {
+      [{ data: tournament, error: e1 }, { data: teams, error: e2 }, { data: matches, error: e3 }] = await fetchTournamentBundle(true);
+    }
+
     if (e1 || !tournament) return NextResponse.json({ error: "Torneo no encontrado" }, { status: 404 });
     if (e2) throw e2;
     if (e3) throw e3;
 
-    const disc = tournament.Discipline as unknown as { id: string; name: string } | null;
-    const cat = tournament.Category as unknown as { id: string; name: string; gender: string } | null;
+    const tournamentRow = tournament as unknown as Record<string, unknown> & {
+      id: string;
+      name: string;
+      format: string | null;
+      status: string;
+      createdAt: string;
+      updatedAt: string;
+      scheduleStartDate?: string | null;
+      scheduleEndDate?: string | null;
+      scheduleMatchesPerMatchday?: number | null;
+      scheduleAllowedWeekdays?: number[] | null;
+      scheduleDailyStartTime?: string | null;
+      scheduleDailyEndTime?: string | null;
+      scheduleMatchDurationMinutes?: number | null;
+      Discipline?: unknown;
+      Category?: unknown;
+    };
+    const matchRows = (matches ?? []) as unknown as Array<{
+      id: string;
+      tournamentId: string;
+      homeTeamId: string | null;
+      awayTeamId: string | null;
+      date: string | null;
+      location: string | null;
+      homeScore: number | null;
+      awayScore: number | null;
+      isFinished: boolean;
+      status?: string;
+      incidentType?: string | null;
+      incidentNotes?: string | null;
+      round: number | null;
+      groupName: string | null;
+      matchLogicIdentifier: string | null;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+    const normalizedTournamentStatus = isTournamentStatus(tournamentRow.status) ? tournamentRow.status : "DRAFT";
+
+    const disc = tournamentRow.Discipline as unknown as { id: string; name: string } | null;
+    const cat = tournamentRow.Category as unknown as { id: string; name: string; gender: string } | null;
 
     const teamsMap = new Map<string, { id: string; name: string; establishmentId: string; establishment: { id: string; name: string; comuna: string | null }; createdAt: string; updatedAt: string }>();
     for (const entry of teams ?? []) {
@@ -61,19 +126,19 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     }
 
     return NextResponse.json({
-      id: tournament.id,
-      name: tournament.name,
-      format: tournament.format,
+      id: tournamentRow.id,
+      name: tournamentRow.name,
+      format: tournamentRow.format,
       status: deriveTournamentStatus({
         teamCount: (teams ?? []).length,
-        matchCount: (matches ?? []).length,
-        finishedMatchCount: (matches ?? []).filter((match) => match.isFinished).length,
-        format: tournament.format,
-        status: tournament.status,
+        matchCount: matchRows.length,
+        finishedMatchCount: matchRows.filter((match) => match.isFinished).length,
+        format: tournamentRow.format,
+        status: normalizedTournamentStatus,
       }),
-      schedulingRules: schedulingRulesFromRow(tournament),
-      createdAt: tournament.createdAt,
-      updatedAt: tournament.updatedAt,
+      schedulingRules: schedulingRulesFromRow(tournamentRow),
+      createdAt: tournamentRow.createdAt,
+      updatedAt: tournamentRow.updatedAt,
       discipline: { id: disc?.id ?? "", name: disc?.name ?? "" },
       category: { id: cat?.id ?? "", name: cat?.name ?? "", gender: cat?.gender ?? "" },
       teams: (teams ?? []).map((entry) => {
@@ -92,7 +157,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           },
         };
       }),
-      matches: (matches ?? []).map((m) => ({
+      matches: matchRows.map((m) => ({
         id: m.id,
         tournamentId: m.tournamentId,
         homeTeamId: m.homeTeamId,
@@ -102,9 +167,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         homeScore: m.homeScore,
         awayScore: m.awayScore,
         isFinished: m.isFinished,
-        status: m.status,
-        incidentType: m.incidentType,
-        incidentNotes: m.incidentNotes,
+        status: (m as { status?: string }).status ?? "SCHEDULED",
+        incidentType: (m as { incidentType?: string | null }).incidentType ?? null,
+        incidentNotes: (m as { incidentNotes?: string | null }).incidentNotes ?? null,
         round: m.round,
         groupName: m.groupName,
         matchLogicIdentifier: m.matchLogicIdentifier,
