@@ -38,6 +38,28 @@ type MatchWithTeams = {
   awayTeam: Team | null;
 };
 
+type StandingRow = {
+  teamId: string;
+  teamName: string;
+  establishmentName: string;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+};
+
+type StandingGroup = {
+  key: string;
+  label: string;
+  rows: StandingRow[];
+  playedMatches: number;
+  pendingMatches: number;
+};
+
 type Props = {
   tournament: {
     id: string;
@@ -69,6 +91,131 @@ function getPlaceholderTeams(match: MatchWithTeams) {
     home: homeLabel,
     away: awayLabel,
   };
+}
+
+function buildStandings(tournament: Props["tournament"]): StandingGroup[] {
+  if (tournament.matches.length === 0) {
+    return [];
+  }
+
+  const teamDirectory = new Map(
+    tournament.teams.map(({ team }) => [
+      team.id,
+      {
+        teamId: team.id,
+        teamName: team.name,
+        establishmentName: team.establishment.name,
+        played: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        goalDifference: 0,
+        points: 0,
+      } satisfies StandingRow,
+    ])
+  );
+
+  const relevantGroups = new Map<string, MatchWithTeams[]>();
+
+  if (tournament.format === "LIGA") {
+    const groupedLeagueMatches = tournament.matches.filter((match) => match.groupName?.startsWith("Grupo "));
+
+    if (groupedLeagueMatches.length > 0) {
+      groupedLeagueMatches.forEach((match) => {
+        const key = match.groupName!;
+        const matches = relevantGroups.get(key) ?? [];
+        matches.push(match);
+        relevantGroups.set(key, matches);
+      });
+    } else {
+      relevantGroups.set("Tabla general", tournament.matches.filter((match) => Boolean(match.homeTeam && match.awayTeam)));
+    }
+  }
+
+  if (tournament.format === "GRUPOS_ELIMINATORIA") {
+    tournament.matches
+      .filter((match) => match.groupName?.startsWith("Grupo "))
+      .forEach((match) => {
+        const key = match.groupName!;
+        const matches = relevantGroups.get(key) ?? [];
+        matches.push(match);
+        relevantGroups.set(key, matches);
+      });
+  }
+
+  return Array.from(relevantGroups.entries()).map(([key, groupMatches]) => {
+    const rows = new Map<string, StandingRow>();
+
+    groupMatches.forEach((match) => {
+      const homeTeam = match.homeTeam;
+      const awayTeam = match.awayTeam;
+
+      if (!homeTeam || !awayTeam) {
+        return;
+      }
+
+      if (!rows.has(homeTeam.id)) {
+        rows.set(homeTeam.id, { ...(teamDirectory.get(homeTeam.id) as StandingRow) });
+      }
+
+      if (!rows.has(awayTeam.id)) {
+        rows.set(awayTeam.id, { ...(teamDirectory.get(awayTeam.id) as StandingRow) });
+      }
+
+      if (!match.isFinished) {
+        return;
+      }
+
+      const homeRow = rows.get(homeTeam.id)!;
+      const awayRow = rows.get(awayTeam.id)!;
+      const homeScore = match.homeScore ?? 0;
+      const awayScore = match.awayScore ?? 0;
+
+      homeRow.played += 1;
+      awayRow.played += 1;
+      homeRow.goalsFor += homeScore;
+      homeRow.goalsAgainst += awayScore;
+      awayRow.goalsFor += awayScore;
+      awayRow.goalsAgainst += homeScore;
+
+      if (homeScore > awayScore) {
+        homeRow.wins += 1;
+        awayRow.losses += 1;
+        homeRow.points += 3;
+      } else if (awayScore > homeScore) {
+        awayRow.wins += 1;
+        homeRow.losses += 1;
+        awayRow.points += 3;
+      } else {
+        homeRow.draws += 1;
+        awayRow.draws += 1;
+        homeRow.points += 1;
+        awayRow.points += 1;
+      }
+    });
+
+    const sortedRows = Array.from(rows.values())
+      .map((row) => ({
+        ...row,
+        goalDifference: row.goalsFor - row.goalsAgainst,
+      }))
+      .sort((left, right) => {
+        if (right.points !== left.points) return right.points - left.points;
+        if (right.goalDifference !== left.goalDifference) return right.goalDifference - left.goalDifference;
+        if (right.goalsFor !== left.goalsFor) return right.goalsFor - left.goalsFor;
+        return left.teamName.localeCompare(right.teamName, "es");
+      });
+
+    return {
+      key,
+      label: key,
+      rows: sortedRows,
+      playedMatches: groupMatches.filter((match) => match.isFinished).length,
+      pendingMatches: groupMatches.filter((match) => !match.isFinished).length,
+    } satisfies StandingGroup;
+  }).filter((group) => group.rows.length > 0);
 }
 
 export function FixtureEngine({ tournament }: Props) {
@@ -167,6 +314,7 @@ export function FixtureEngine({ tournament }: Props) {
     acc[key].push(m);
     return acc;
   }, {});
+  const standingsByGroup = buildStandings(tournament);
 
   return (
     <div className="flex flex-col gap-6">
@@ -406,6 +554,14 @@ export function FixtureEngine({ tournament }: Props) {
             </div>
           </div>
 
+          {standingsByGroup.length > 0 && (
+            <div className="space-y-4">
+              {standingsByGroup.map((group) => (
+                <StandingsTable key={group.key} group={group} />
+              ))}
+            </div>
+          )}
+
           {Object.entries(matchesByGroup).map(([groupKey, groupMatches]) => (
             <MatchGroup
               key={groupKey}
@@ -420,6 +576,60 @@ export function FixtureEngine({ tournament }: Props) {
         </div>
       )}
     </div>
+  );
+}
+
+function StandingsTable({ group }: { group: StandingGroup }) {
+  return (
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-5 py-3">
+        <div>
+          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700">{group.label}</h3>
+          <p className="text-xs text-slate-500">Partidos cerrados: {group.playedMatches} · Pendientes: {group.pendingMatches}</p>
+        </div>
+        <span className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+          Tabla de posiciones
+        </span>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead className="bg-white text-xs uppercase tracking-wider text-slate-500">
+            <tr>
+              <th className="px-4 py-3 text-left">#</th>
+              <th className="px-4 py-3 text-left">Equipo</th>
+              <th className="px-3 py-3 text-center">PJ</th>
+              <th className="px-3 py-3 text-center">PG</th>
+              <th className="px-3 py-3 text-center">PE</th>
+              <th className="px-3 py-3 text-center">PP</th>
+              <th className="px-3 py-3 text-center">GF</th>
+              <th className="px-3 py-3 text-center">GC</th>
+              <th className="px-3 py-3 text-center">DG</th>
+              <th className="px-3 py-3 text-center">PTS</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {group.rows.map((row, index) => (
+              <tr key={row.teamId} className={index < 2 ? "bg-emerald-50/50" : "bg-white"}>
+                <td className="px-4 py-3 font-semibold text-slate-600">{index + 1}</td>
+                <td className="px-4 py-3">
+                  <div className="font-semibold text-slate-800">{row.teamName}</div>
+                  <div className="text-xs text-slate-500">{row.establishmentName}</div>
+                </td>
+                <td className="px-3 py-3 text-center text-slate-700">{row.played}</td>
+                <td className="px-3 py-3 text-center text-slate-700">{row.wins}</td>
+                <td className="px-3 py-3 text-center text-slate-700">{row.draws}</td>
+                <td className="px-3 py-3 text-center text-slate-700">{row.losses}</td>
+                <td className="px-3 py-3 text-center text-slate-700">{row.goalsFor}</td>
+                <td className="px-3 py-3 text-center text-slate-700">{row.goalsAgainst}</td>
+                <td className="px-3 py-3 text-center font-semibold text-slate-800">{row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}</td>
+                <td className="px-3 py-3 text-center font-bold text-slate-900">{row.points}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
