@@ -157,6 +157,7 @@ export async function updateMatchResult(input: {
 
   const requiresScore = nextStatus === "FINISHED" || nextStatus === "WALKOVER";
   const providedScore = input.homeScore !== undefined || input.awayScore !== undefined;
+  const trimmedIncidentNotes = typeof input.incidentNotes === "string" ? input.incidentNotes.trim() : "";
 
   if (requiresScore) {
     if (!isNonNegativeInteger(input.homeScore) || !isNonNegativeInteger(input.awayScore)) {
@@ -170,11 +171,11 @@ export async function updateMatchResult(input: {
     throw new ServiceError(400, "Las incidencias deben incluir una nota descriptiva");
   }
 
-  if (nextIncidentType && !input.incidentNotes.trim()) {
+  if (nextIncidentType && !trimmedIncidentNotes) {
     throw new ServiceError(400, "Las incidencias deben incluir una nota descriptiva");
   }
 
-  if (!nextIncidentType && input.incidentNotes && input.incidentNotes.trim()) {
+  if (!nextIncidentType && trimmedIncidentNotes) {
     throw new ServiceError(400, "No puedes guardar notas de incidencia sin un tipo de incidencia");
   }
 
@@ -204,7 +205,7 @@ export async function updateMatchResult(input: {
   }
 
   if (input.incidentNotes !== undefined) {
-    updateData.incidentNotes = input.incidentNotes?.trim() || null;
+    updateData.incidentNotes = trimmedIncidentNotes || null;
   }
 
   const { data, error } = await supabase

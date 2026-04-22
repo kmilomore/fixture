@@ -1,5 +1,11 @@
 import { getSupabase } from "@/infrastructure/supabase/client";
 import {
+  isMatchIncidentType,
+  isMatchStatus,
+  type MatchIncidentType,
+  type MatchStatus,
+} from "@/features/fixture/domain/match-lifecycle";
+import {
   DEFAULT_SCHEDULING_RULES,
   canTransitionTournamentStatus,
   deriveTournamentStatus,
@@ -49,8 +55,8 @@ export type TournamentMatchEntry = {
   homeScore: number | null;
   awayScore: number | null;
   isFinished: boolean;
-  status: string;
-  incidentType: string | null;
+  status: MatchStatus;
+  incidentType: MatchIncidentType | null;
   incidentNotes: string | null;
   round: number | null;
   groupName: string | null;
@@ -176,7 +182,7 @@ export async function listTournaments(searchQuery = "") {
   }
 
   return (data ?? []).map((row) => {
-    const tournamentRow = row as Record<string, unknown> & {
+    const tournamentRow = row as unknown as Record<string, unknown> & {
       id: string;
       name: string;
       format: string | null;
@@ -254,13 +260,20 @@ export async function createTournament(input: { name: string; disciplineId: stri
     throw error;
   }
 
-  const tournamentRow = data as Record<string, unknown> & {
+  const tournamentRow = data as unknown as Record<string, unknown> & {
     id: string;
     name: string;
     format: string | null;
     status: string;
     createdAt: string;
     updatedAt: string;
+    scheduleStartDate?: string | null;
+    scheduleEndDate?: string | null;
+    scheduleMatchesPerMatchday?: number | null;
+    scheduleAllowedWeekdays?: number[] | null;
+    scheduleDailyStartTime?: string | null;
+    scheduleDailyEndTime?: string | null;
+    scheduleMatchDurationMinutes?: number | null;
     Discipline?: unknown;
     Category?: unknown;
   };
@@ -315,18 +328,25 @@ export async function getTournamentDetail(id: string) {
     throw matchesError;
   }
 
-  const tournamentRow = tournament as Record<string, unknown> & {
+  const tournamentRow = tournament as unknown as Record<string, unknown> & {
     id: string;
     name: string;
     format: string | null;
     status: string;
     createdAt: string;
     updatedAt: string;
+    scheduleStartDate?: string | null;
+    scheduleEndDate?: string | null;
+    scheduleMatchesPerMatchday?: number | null;
+    scheduleAllowedWeekdays?: number[] | null;
+    scheduleDailyStartTime?: string | null;
+    scheduleDailyEndTime?: string | null;
+    scheduleMatchDurationMinutes?: number | null;
     Discipline?: unknown;
     Category?: unknown;
   };
-  const teamEntries = (teams ?? []) as Array<{ id: string; tournamentId: string; teamId: string; Team?: unknown }>;
-  const matchEntries = (matches ?? []) as Array<{
+  const teamEntries = (teams ?? []) as unknown as Array<{ id: string; tournamentId: string; teamId: string; Team?: unknown }>;
+  const matchEntries = (matches ?? []) as unknown as Array<{
     id: string;
     tournamentId: string;
     homeTeamId: string | null;
@@ -378,8 +398,8 @@ export async function getTournamentDetail(id: string) {
       homeScore: match.homeScore,
       awayScore: match.awayScore,
       isFinished: match.isFinished,
-      status: match.status ?? "SCHEDULED",
-      incidentType: match.incidentType ?? null,
+      status: isMatchStatus(match.status) ? match.status : "SCHEDULED",
+      incidentType: isMatchIncidentType(match.incidentType) ? match.incidentType : null,
       incidentNotes: match.incidentNotes ?? null,
       round: match.round,
       groupName: match.groupName,

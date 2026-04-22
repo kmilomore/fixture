@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { generateFixture, type FixtureGenerationOptions } from "@/features/fixture/application/fixture-service";
+import { generateFixture } from "@/features/fixture/application/fixture-service";
+import type { FixtureGenerationOptions } from "@/features/fixture/domain/fixture-engine";
 import { asServiceError } from "@/shared/lib/service-error";
 
 export const dynamic = "force-dynamic";

@@ -63,7 +63,7 @@ export default function CsvImporter() {
 
     startTransition(async () => {
       const res = await bulkCreateEstablishments(rows);
-      if (res.error) {
+      if ("error" in res) {
         setError(res.error);
       } else {
         setResult(`✅ Se importaron ${res.count} establecimientos correctamente.`);
