@@ -27,6 +27,7 @@ export type FixtureSchedulingRules = {
 export type FixtureGenerationOptions = {
   format: FixtureFormat;
   groupCount?: number;
+  seededTeamIds?: string[];
   schedulingRules?: FixtureSchedulingRules;
 };
 
@@ -168,15 +169,25 @@ function assignScheduleToMatches(matches: FixtureMatch[], schedulingRules?: Fixt
   }));
 }
 
-function distributeTeamsIntoGroups(teams: FixtureTeam[], requestedGroupCount: number) {
+function distributeTeamsIntoGroups(teams: FixtureTeam[], requestedGroupCount: number, seededTeamIds: string[] = []) {
   const groupCount = Math.max(1, Math.min(requestedGroupCount, teams.length));
   const groups: TeamGroup[] = Array.from({ length: groupCount }, (_, index) => ({
     label: buildGroupLabel(index),
     teams: [],
   }));
   const orderedTeams = [...teams].sort((left, right) => left.name.localeCompare(right.name, "es"));
+  const seededIds = Array.from(new Set(seededTeamIds)).slice(0, groupCount);
+  const seededTeams = seededIds
+    .map((teamId) => orderedTeams.find((team) => team.id === teamId) ?? null)
+    .filter((team): team is FixtureTeam => Boolean(team));
 
-  orderedTeams.forEach((team, index) => {
+  seededTeams.forEach((team, index) => {
+    groups[index]?.teams.push(team);
+  });
+
+  const remainingTeams = orderedTeams.filter((team) => !seededTeams.some((seededTeam) => seededTeam.id === team.id));
+
+  remainingTeams.forEach((team, index) => {
     const cycle = Math.floor(index / groupCount);
     const offset = index % groupCount;
     const groupIndex = cycle % 2 === 0 ? offset : groupCount - 1 - offset;
@@ -351,12 +362,12 @@ export function generateFixtureMatches(teams: FixtureTeam[], options: FixtureGen
       throw new Error("El formato grupos + eliminatoria permite 2, 3, 4, 8 o mas grupos en potencia de 2. Con 3 grupos clasifican los primeros de cada grupo y el mejor 2°.");
     }
 
-    const groups = distributeTeamsIntoGroups(teams, groupCount);
+    const groups = distributeTeamsIntoGroups(teams, groupCount, options.seededTeamIds);
     matches = generateGroupPlusKnockout(groups);
   } else if (groupCount <= 1) {
     matches = generateRoundRobinForGroup(teams);
   } else {
-    const groups = distributeTeamsIntoGroups(teams, groupCount);
+    const groups = distributeTeamsIntoGroups(teams, groupCount, options.seededTeamIds);
     matches = groups.flatMap((group) => generateRoundRobinForGroup(group.teams, group.label));
   }
 

@@ -32,6 +32,7 @@ export function FixtureEngine({ tournament }: Props) {
   const schedulingRules = tournament.schedulingRules ?? DEFAULT_SCHEDULING_RULES;
   const [selectedFormat, setSelectedFormat] = useState<FixtureFormat | null>((tournament.format as FixtureFormat) || null);
   const [groupCount, setGroupCount] = useState(1);
+  const [seededTeamIds, setSeededTeamIds] = useState<string[]>([]);
   const [startDate, setStartDate] = useState(schedulingRules.startDate);
   const [endDate, setEndDate] = useState(schedulingRules.endDate);
   const [matchesPerMatchday, setMatchesPerMatchday] = useState(schedulingRules.matchesPerMatchday);
@@ -55,15 +56,21 @@ export function FixtureEngine({ tournament }: Props) {
     : 0;
   const estimatedMatchdays = estimateRequiredMatchdays(estimatedMatchCount, matchesPerMatchday);
 
+  function updateGroupCount(nextValue: number) {
+    const normalizedValue = Math.max(1, nextValue);
+    setGroupCount(normalizedValue);
+    setSeededTeamIds((current) => current.slice(0, normalizedValue));
+  }
+
   function handleFormatSelection(format: FixtureFormat) {
     setSelectedFormat(format);
     if (format === "GRUPOS_ELIMINATORIA" && groupCount < 2) {
-      setGroupCount(2);
+      updateGroupCount(2);
       return;
     }
 
     if (format === "ELIMINATORIA") {
-      setGroupCount(1);
+      updateGroupCount(1);
     }
   }
 
@@ -75,6 +82,14 @@ export function FixtureEngine({ tournament }: Props) {
     );
   }
 
+  function setSeededTeamId(groupIndex: number, teamId: string) {
+    setSeededTeamIds((current) => {
+      const next = [...current];
+      next[groupIndex] = teamId;
+      return next.filter((value, index) => value || index < groupCount);
+    });
+  }
+
   function getGenerationOptions(): FixtureGenerationOptions | null {
     if (!selectedFormat) {
       return null;
@@ -83,6 +98,7 @@ export function FixtureEngine({ tournament }: Props) {
     return {
       format: selectedFormat,
       groupCount: selectedFormat === "ELIMINATORIA" ? 1 : groupCount,
+      seededTeamIds: selectedFormat === "ELIMINATORIA" ? [] : seededTeamIds.filter(Boolean),
       schedulingRules: {
         startDate,
         endDate,
@@ -135,6 +151,8 @@ export function FixtureEngine({ tournament }: Props) {
           selectedFormat={selectedFormat}
           groupCount={groupCount}
           teamCount={tournament.teams.length}
+          teams={tournament.teams.map(({ team }) => team)}
+          seededTeamIds={seededTeamIds}
           startDate={startDate}
           endDate={endDate}
           matchesPerMatchday={matchesPerMatchday}
@@ -148,7 +166,8 @@ export function FixtureEngine({ tournament }: Props) {
           isPending={isPending}
           message={message}
           onSelectFormat={handleFormatSelection}
-          onSetGroupCount={setGroupCount}
+          onSetGroupCount={updateGroupCount}
+          onSetSeededTeamId={setSeededTeamId}
           onSetStartDate={setStartDate}
           onSetEndDate={setEndDate}
           onSetMatchesPerMatchday={setMatchesPerMatchday}

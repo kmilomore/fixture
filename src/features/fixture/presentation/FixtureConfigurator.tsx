@@ -12,6 +12,8 @@ type FixtureConfiguratorProps = {
   selectedFormat: FixtureFormat | null;
   groupCount: number;
   teamCount: number;
+  teams: Array<{ id: string; name: string; establishment: { name: string } }>;
+  seededTeamIds: string[];
   startDate: string;
   endDate: string;
   matchesPerMatchday: number;
@@ -26,6 +28,7 @@ type FixtureConfiguratorProps = {
   message: string | null;
   onSelectFormat: (format: FixtureFormat) => void;
   onSetGroupCount: (value: number) => void;
+  onSetSeededTeamId: (groupIndex: number, teamId: string) => void;
   onSetStartDate: (value: string) => void;
   onSetEndDate: (value: string) => void;
   onSetMatchesPerMatchday: (value: number) => void;
@@ -40,6 +43,8 @@ export function FixtureConfigurator({
   selectedFormat,
   groupCount,
   teamCount,
+  teams,
+  seededTeamIds,
   startDate,
   endDate,
   matchesPerMatchday,
@@ -54,6 +59,7 @@ export function FixtureConfigurator({
   message,
   onSelectFormat,
   onSetGroupCount,
+  onSetSeededTeamId,
   onSetStartDate,
   onSetEndDate,
   onSetMatchesPerMatchday,
@@ -63,6 +69,8 @@ export function FixtureConfigurator({
   onToggleWeekday,
   onGenerate,
 }: FixtureConfiguratorProps) {
+  const showSeedConfiguration = selectedFormat !== "ELIMINATORIA" && groupCount > 1;
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
       <h3 className="font-bold text-slate-800 text-lg mb-4 flex items-center gap-2">
@@ -127,6 +135,45 @@ export function FixtureConfigurator({
             <p className="mt-2 text-xs text-slate-500">
               Para este formato puedes usar 2, 3, 4, 8 o mas grupos en potencia de 2. Con 3 grupos clasifican los tres primeros y el mejor segundo.
             </p>
+          )}
+
+          {showSeedConfiguration && (
+            <div className="mt-4 space-y-3 border-t border-slate-200 pt-4">
+              <div>
+                <h5 className="text-sm font-semibold text-slate-800">Cabezas de serie</h5>
+                <p className="mt-1 text-xs text-slate-500">
+                  Puedes fijar un cabeza de serie por grupo. El resto de equipos se reparte automaticamente sin repetir seleccionados.
+                </p>
+              </div>
+              <div className="grid gap-3">
+                {Array.from({ length: groupCount }, (_, groupIndex) => {
+                  const selectedTeamId = seededTeamIds[groupIndex] ?? "";
+                  const usedSeedIds = seededTeamIds.filter((seededId, index) => seededId && index !== groupIndex);
+
+                  return (
+                    <label key={groupIndex} className="text-sm text-slate-600">
+                      <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        Cabeza de serie {groupIndex + 1}
+                      </span>
+                      <select
+                        value={selectedTeamId}
+                        onChange={(event) => onSetSeededTeamId(groupIndex, event.target.value)}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-500"
+                      >
+                        <option value="">Asignacion automatica</option>
+                        {teams
+                          .filter((team) => !usedSeedIds.includes(team.id) || team.id === selectedTeamId)
+                          .map((team) => (
+                            <option key={team.id} value={team.id}>
+                              {team.name} · {team.establishment.name}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
 

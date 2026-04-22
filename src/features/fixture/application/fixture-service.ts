@@ -5,6 +5,7 @@ import {
   type FixtureGenerationOptions,
   type FixtureSchedulingRules,
 } from "@/features/fixture/domain/fixture-engine";
+import { buildAutomaticFixtureAssignments } from "@/features/fixture/domain/progression";
 import {
   deriveTournamentStatus,
   schedulingRulesToRow,
@@ -20,6 +21,78 @@ import { ServiceError } from "@/shared/lib/service-error";
 
 function isNonNegativeInteger(value: unknown) {
   return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+async function applyAutomaticFixtureAssignments(input: { tournamentId: string; format: FixtureFormat | null }) {
+  if (!input.format) {
+    return;
+  }
+
+  const supabase = getSupabase();
+  const [{ data: matches }, { data: teams }] = await Promise.all([
+    supabase
+      .from("Match")
+      .select("id, round, groupName, matchLogicIdentifier, homeTeamId, awayTeamId, homeScore, awayScore, isFinished, createdAt, status")
+      .eq("tournamentId", input.tournamentId)
+      .order("round", { ascending: true, nullsFirst: false })
+      .order("createdAt", { ascending: true }),
+    supabase.from("TournamentTeam").select("teamId, Team(id, name)").eq("tournamentId", input.tournamentId),
+  ]);
+
+  const normalizedMatches = (matches ?? []).map((match) => ({
+    id: match.id,
+    round: match.round,
+    groupName: match.groupName,
+    matchLogicIdentifier: match.matchLogicIdentifier,
+    homeTeamId: match.homeTeamId,
+    awayTeamId: match.awayTeamId,
+    homeScore: match.homeScore,
+    awayScore: match.awayScore,
+    isFinished: match.isFinished,
+    createdAt: match.createdAt,
+    status: match.status,
+  }));
+  const normalizedTeams = (teams ?? []).map((entry) => {
+    const team = entry.Team as unknown as { id: string; name: string } | null;
+    return { id: team?.id ?? entry.teamId, name: team?.name ?? "" };
+  });
+
+  const assignments = buildAutomaticFixtureAssignments({
+    format: input.format,
+    teams: normalizedTeams,
+    matches: normalizedMatches,
+  });
+
+  if (assignments.length === 0) {
+    return;
+  }
+
+  await Promise.all(
+    assignments.map(async (assignment) => {
+      const currentMatch = normalizedMatches.find((match) => match.id === assignment.matchId);
+      if (!currentMatch || currentMatch.isFinished) {
+        return;
+      }
+
+      const { error } = await supabase
+        .from("Match")
+        .update({
+          homeTeamId: assignment.homeTeamId,
+          awayTeamId: assignment.awayTeamId,
+          homeScore: null,
+          awayScore: null,
+          isFinished: false,
+          status: "SCHEDULED",
+          incidentType: null,
+          incidentNotes: null,
+        })
+        .eq("id", assignment.matchId);
+
+      if (error) {
+        throw error;
+      }
+    })
+  );
 }
 
 export async function setTournamentFormat(input: {
@@ -113,6 +186,11 @@ export async function generateFixture(input: { tournamentId: string; options: Fi
   if (updateError) {
     throw updateError;
   }
+
+  await applyAutomaticFixtureAssignments({
+    tournamentId: input.tournamentId,
+    format: input.options.format,
+  });
 
   return { success: true, count: fixtureMatches.length };
 }
@@ -226,6 +304,11 @@ export async function updateMatchResult(input: {
   ]);
 
   if (tournament) {
+    await applyAutomaticFixtureAssignments({
+      tournamentId: data.tournamentId,
+      format: tournament.format as FixtureFormat | null,
+    });
+
     const { count: teamCount } = await supabase.from("TournamentTeam").select("id", { count: "exact", head: true }).eq("tournamentId", data.tournamentId);
     await supabase
       .from("Tournament")

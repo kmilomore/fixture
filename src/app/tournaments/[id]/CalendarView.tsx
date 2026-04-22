@@ -7,7 +7,7 @@ import {
   MATCH_STATUSES,
   type MatchIncidentType,
   type MatchStatus,
-} from "@/lib/matchLifecycle";
+} from "@/features/fixture/domain/match-lifecycle";
 
 type CalendarMatch = {
   id: string;
@@ -26,7 +26,13 @@ type CalendarMatch = {
 };
 
 function getPhaseLabel(match: CalendarMatch) {
-  return match.groupName || match.matchLogicIdentifier || "Partido";
+  const matchdayLabel = match.matchLogicIdentifier && !match.matchLogicIdentifier.includes(" vs ") ? match.matchLogicIdentifier : null;
+
+  if (match.groupName && matchdayLabel) {
+    return `${match.groupName} · ${matchdayLabel}`;
+  }
+
+  return match.groupName || matchdayLabel || "Partido";
 }
 
 function getCalendarKey(date: string | null) {
@@ -39,10 +45,10 @@ function getCalendarKey(date: string | null) {
 
 function getTeamLabel(team: CalendarMatch["homeTeam"]) {
   if (!team) {
-    return "BYE";
+    return { name: "BYE", establishment: null };
   }
 
-  return `${team.name} · ${team.establishment.name}`;
+  return { name: team.name, establishment: team.establishment.name };
 }
 
 export function CalendarView({ matches }: { matches: CalendarMatch[] }) {
@@ -158,11 +164,21 @@ export function CalendarView({ matches }: { matches: CalendarMatch[] }) {
                   </div>
 
                   <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
-                    <div className="text-sm font-semibold text-slate-700 md:text-right">{getTeamLabel(match.homeTeam)}</div>
+                    <div className="text-sm md:text-right">
+                      <div className="font-semibold text-slate-700">{getTeamLabel(match.homeTeam).name}</div>
+                      {getTeamLabel(match.homeTeam).establishment && (
+                        <div className="text-xs text-slate-500">{getTeamLabel(match.homeTeam).establishment}</div>
+                      )}
+                    </div>
                     <div className={`min-w-[92px] rounded-lg px-3 py-2 text-center font-mono text-sm font-bold ${match.isFinished ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"}`}>
                       {match.isFinished ? `${match.homeScore ?? 0} - ${match.awayScore ?? 0}` : "vs"}
                     </div>
-                    <div className="text-sm font-semibold text-slate-700">{getTeamLabel(match.awayTeam)}</div>
+                    <div className="text-sm">
+                      <div className="font-semibold text-slate-700">{getTeamLabel(match.awayTeam).name}</div>
+                      {getTeamLabel(match.awayTeam).establishment && (
+                        <div className="text-xs text-slate-500">{getTeamLabel(match.awayTeam).establishment}</div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">

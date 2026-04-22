@@ -37,6 +37,7 @@ export type StandingRow = {
   goalsAgainst: number;
   goalDifference: number;
   points: number;
+  qualification: "DIRECT" | "WILDCARD" | null;
 };
 
 export type StandingGroup = {

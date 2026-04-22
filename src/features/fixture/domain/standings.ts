@@ -20,6 +20,7 @@ export function buildStandings(tournament: FixtureTournamentView): StandingGroup
         goalsAgainst: 0,
         goalDifference: 0,
         points: 0,
+        qualification: null,
       } satisfies StandingRow,
     ])
   );
@@ -55,7 +56,7 @@ export function buildStandings(tournament: FixtureTournamentView): StandingGroup
       });
   }
 
-  return Array.from(relevantGroups.entries())
+  const standingGroups = Array.from(relevantGroups.entries())
     .map(([key, groupMatches]) => {
       const rows = new Map<string, StandingRow>();
 
@@ -128,6 +129,36 @@ export function buildStandings(tournament: FixtureTournamentView): StandingGroup
       } satisfies StandingGroup;
     })
     .filter((group) => group.rows.length > 0);
+
+  if (tournament.format === "GRUPOS_ELIMINATORIA" && standingGroups.length === 3) {
+    const secondPlaceRows = standingGroups
+      .map((group) => group.rows[1] ?? null)
+      .filter((row): row is StandingRow => Boolean(row))
+      .sort((left, right) => {
+        if (right.points !== left.points) return right.points - left.points;
+        if (right.goalDifference !== left.goalDifference) return right.goalDifference - left.goalDifference;
+        if (right.goalsFor !== left.goalsFor) return right.goalsFor - left.goalsFor;
+        return left.teamName.localeCompare(right.teamName, "es");
+      });
+
+    const wildcardTeamId = secondPlaceRows[0]?.teamId ?? null;
+
+    standingGroups.forEach((group) => {
+      group.rows.forEach((row, index) => {
+        row.qualification = index === 0 ? "DIRECT" : row.teamId === wildcardTeamId ? "WILDCARD" : null;
+      });
+    });
+
+    return standingGroups;
+  }
+
+  standingGroups.forEach((group) => {
+    group.rows.forEach((row, index) => {
+      row.qualification = index < 2 ? "DIRECT" : null;
+    });
+  });
+
+  return standingGroups;
 }
 
 export function groupMatchesByStage(matches: MatchWithTeams[]) {

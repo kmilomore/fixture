@@ -113,13 +113,9 @@ export async function GET(
   }
 
   const bytes = await pdf.save();
-  const arrayBuffer = bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength
-  ) as ArrayBuffer;
-  const body = new Blob([arrayBuffer], { type: "application/pdf" });
+  const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 
-  return new NextResponse(body, {
+  return new Response(body, {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${buildTournamentExportFileName(fixture.name, "pdf")}"`,
