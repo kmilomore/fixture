@@ -1,12 +1,9 @@
 import { getSupabase } from "@/infrastructure/supabase/client";
 import { buildAutomaticFixtureAssignments } from "@/features/fixture/domain/progression";
 import type { FixtureFormat } from "@/features/fixture/domain/fixture-engine";
+import { resolveFixtureFormat } from "@/features/fixture/domain/fixture-format";
 
 export async function syncAutomaticFixtureAssignments(input: { tournamentId: string; format: FixtureFormat | null }) {
-  if (!input.format) {
-    return false;
-  }
-
   const supabase = getSupabase();
   const [{ data: matches }, { data: teams }] = await Promise.all([
     supabase
@@ -39,8 +36,13 @@ export async function syncAutomaticFixtureAssignments(input: { tournamentId: str
     return { id: team?.id ?? entry.teamId, name: team?.name ?? "" };
   });
 
+  const effectiveFormat = resolveFixtureFormat(input.format, normalizedMatches);
+  if (!effectiveFormat) {
+    return false;
+  }
+
   const assignments = buildAutomaticFixtureAssignments({
-    format: input.format,
+    format: effectiveFormat,
     teams: normalizedTeams,
     matches: normalizedMatches,
   });

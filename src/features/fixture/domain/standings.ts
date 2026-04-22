@@ -1,9 +1,12 @@
 import type { FixtureTournamentView, MatchWithTeams, StandingGroup, StandingRow } from "@/features/fixture/types";
+import { resolveFixtureFormat } from "@/features/fixture/domain/fixture-format";
 
 export function buildStandings(tournament: FixtureTournamentView): StandingGroup[] {
   if (tournament.matches.length === 0) {
     return [];
   }
+
+  const effectiveFormat = resolveFixtureFormat(tournament.format, tournament.matches);
 
   const teamDirectory = new Map(
     tournament.teams.map(({ team }) => [
@@ -27,7 +30,7 @@ export function buildStandings(tournament: FixtureTournamentView): StandingGroup
 
   const relevantGroups = new Map<string, MatchWithTeams[]>();
 
-  if (tournament.format === "LIGA") {
+  if (effectiveFormat === "LIGA") {
     const groupedLeagueMatches = tournament.matches.filter((match) => match.groupName?.startsWith("Grupo "));
 
     if (groupedLeagueMatches.length > 0) {
@@ -45,7 +48,7 @@ export function buildStandings(tournament: FixtureTournamentView): StandingGroup
     }
   }
 
-  if (tournament.format === "GRUPOS_ELIMINATORIA") {
+  if (effectiveFormat === "GRUPOS_ELIMINATORIA") {
     tournament.matches
       .filter((match) => match.groupName?.startsWith("Grupo "))
       .forEach((match) => {
@@ -130,7 +133,7 @@ export function buildStandings(tournament: FixtureTournamentView): StandingGroup
     })
     .filter((group) => group.rows.length > 0);
 
-  if (tournament.format === "GRUPOS_ELIMINATORIA" && standingGroups.length === 3) {
+  if (effectiveFormat === "GRUPOS_ELIMINATORIA" && standingGroups.length === 3) {
     const secondPlaceRows = standingGroups
       .map((group) => group.rows[1] ?? null)
       .filter((row): row is StandingRow => Boolean(row))
@@ -154,7 +157,9 @@ export function buildStandings(tournament: FixtureTournamentView): StandingGroup
 
   standingGroups.forEach((group) => {
     group.rows.forEach((row, index) => {
-      row.qualification = index < 2 ? "DIRECT" : null;
+      row.qualification = effectiveFormat === "GRUPOS_ELIMINATORIA" || effectiveFormat === "LIGA"
+        ? index < 2 ? "DIRECT" : null
+        : null;
     });
   });
 

@@ -18,6 +18,76 @@ function buildLeagueTournament(matches: MatchWithTeams[]): FixtureTournamentView
 }
 
 describe("standings domain", () => {
+  it("infers standings for grouped tournaments even when persisted format is missing", () => {
+    const tournament: FixtureTournamentView = {
+      id: "t2",
+      format: null,
+      status: "SCHEDULED",
+      schedulingRules: undefined,
+      teams: [
+        { team: { id: "a", name: "Alpha", establishment: { name: "Colegio A" } } },
+        { team: { id: "b", name: "Beta", establishment: { name: "Colegio B" } } },
+        { team: { id: "c", name: "Gamma", establishment: { name: "Colegio C" } } },
+        { team: { id: "d", name: "Delta", establishment: { name: "Colegio D" } } },
+      ],
+      matches: [
+        {
+          id: "m1",
+          round: 1,
+          groupName: "Grupo A",
+          matchLogicIdentifier: "Fecha 1",
+          date: null,
+          location: null,
+          homeScore: 2,
+          awayScore: 0,
+          isFinished: true,
+          status: "FINISHED",
+          incidentType: null,
+          incidentNotes: null,
+          homeTeam: { id: "a", name: "Alpha", establishment: { name: "Colegio A" } },
+          awayTeam: { id: "b", name: "Beta", establishment: { name: "Colegio B" } },
+        },
+        {
+          id: "m2",
+          round: 1,
+          groupName: "Grupo B",
+          matchLogicIdentifier: "Fecha 1",
+          date: null,
+          location: null,
+          homeScore: 1,
+          awayScore: 0,
+          isFinished: true,
+          status: "FINISHED",
+          incidentType: null,
+          incidentNotes: null,
+          homeTeam: { id: "c", name: "Gamma", establishment: { name: "Colegio C" } },
+          awayTeam: { id: "d", name: "Delta", establishment: { name: "Colegio D" } },
+        },
+        {
+          id: "sf1",
+          round: 2,
+          groupName: "Semifinal",
+          matchLogicIdentifier: "1A vs 2B",
+          date: null,
+          location: null,
+          homeScore: null,
+          awayScore: null,
+          isFinished: false,
+          status: "SCHEDULED",
+          incidentType: null,
+          incidentNotes: null,
+          homeTeam: null,
+          awayTeam: null,
+        },
+      ],
+    };
+
+    const standings = buildStandings(tournament);
+
+    expect(standings).toHaveLength(2);
+    expect(standings.map((group) => group.key)).toEqual(["Grupo A", "Grupo B"]);
+  });
+
   it("builds and sorts a general league table from finished matches", () => {
     const tournament = buildLeagueTournament([
       {

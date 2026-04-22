@@ -1,5 +1,6 @@
 import { getSupabase } from "@/infrastructure/supabase/client";
 import { syncAutomaticFixtureAssignments } from "@/features/fixture/application/automatic-assignment-service";
+import { resolveFixtureFormat } from "@/features/fixture/domain/fixture-format";
 import {
   isMatchIncidentType,
   normalizeMatchStatus,
@@ -371,8 +372,9 @@ export async function getTournamentDetail(id: string) {
   const discipline = tournamentRow.Discipline as { id: string; name: string } | null;
   const category = tournamentRow.Category as { id: string; name: string; gender: string } | null;
   const teamsMap = buildTeamsMap(teamEntries);
+  const effectiveFormat = resolveFixtureFormat(tournamentRow.format, matchEntries);
 
-  if (tournamentRow.format) {
+  if (effectiveFormat) {
     const hasResolvableKnockoutPlaceholders = matchEntries.some(
       (match) =>
         Boolean(match.matchLogicIdentifier?.includes(" vs ")) &&
@@ -382,7 +384,7 @@ export async function getTournamentDetail(id: string) {
     if (hasResolvableKnockoutPlaceholders) {
       const assignmentsSynced = await syncAutomaticFixtureAssignments({
         tournamentId: id,
-        format: tournamentRow.format as FixtureFormat,
+        format: effectiveFormat,
       });
 
       if (assignmentsSynced) {
@@ -425,12 +427,12 @@ export async function getTournamentDetail(id: string) {
   return {
     id: tournamentRow.id,
     name: tournamentRow.name,
-    format: tournamentRow.format,
+    format: effectiveFormat,
     status: deriveTournamentStatus({
       teamCount: teamEntries.length,
       matchCount: normalizedMatchEntries.length,
       finishedMatchCount: normalizedMatchEntries.filter((match) => match.isFinished).length,
-      format: tournamentRow.format,
+      format: effectiveFormat,
       status: normalizedStatus,
     }),
     schedulingRules: schedulingRulesFromRow(tournamentRow),
