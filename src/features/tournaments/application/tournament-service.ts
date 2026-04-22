@@ -1,5 +1,5 @@
 import { getSupabase } from "@/infrastructure/supabase/client";
-import { syncAutomaticFixtureAssignments } from "@/features/fixture/application/automatic-assignment-service";
+import { buildAutomaticFixtureAssignments } from "@/features/fixture/domain/progression";
 import { resolveFixtureFormat } from "@/features/fixture/domain/fixture-format";
 import {
   isMatchIncidentType,
@@ -16,7 +16,7 @@ import {
   schedulingRulesToRow,
   type TournamentStatus,
 } from "@/features/tournaments/domain/tournament-lifecycle";
-import type { FixtureFormat, FixtureSchedulingRules } from "@/features/fixture/domain/fixture-engine";
+import type { FixtureSchedulingRules } from "@/features/fixture/domain/fixture-engine";
 import { ServiceError } from "@/shared/lib/service-error";
 
 export type TournamentListItem = {
@@ -374,37 +374,7 @@ export async function getTournamentDetail(id: string) {
   const teamsMap = buildTeamsMap(teamEntries);
   const effectiveFormat = resolveFixtureFormat(tournamentRow.format, matchEntries);
 
-  if (effectiveFormat) {
-    const hasResolvableKnockoutPlaceholders = matchEntries.some(
-      (match) =>
-        Boolean(match.matchLogicIdentifier?.includes(" vs ")) &&
-        (!match.homeTeamId || !match.awayTeamId)
-    );
-
-    if (hasResolvableKnockoutPlaceholders) {
-      const assignmentsSynced = await syncAutomaticFixtureAssignments({
-        tournamentId: id,
-        format: effectiveFormat,
-      });
-
-      if (assignmentsSynced) {
-        const refetchMatches = await supabase
-          .from("Match")
-          .select(matchesError && hasMissingTournamentColumns(matchesError) ? MATCH_DETAIL_LEGACY_SELECT : MATCH_DETAIL_SELECT)
-          .eq("tournamentId", id)
-          .order("round", { ascending: true, nullsFirst: false })
-          .order("createdAt", { ascending: true });
-
-        if (refetchMatches.error) {
-          throw refetchMatches.error;
-        }
-
-        matches = refetchMatches.data;
-      }
-    }
-  }
-
-  const normalizedMatchEntries = (matches ?? []) as unknown as Array<{
+  let normalizedMatchEntries = (matches ?? []) as unknown as Array<{
     id: string;
     tournamentId: string;
     homeTeamId: string | null;
@@ -423,6 +393,48 @@ export async function getTournamentDetail(id: string) {
     createdAt: string;
     updatedAt: string;
   }>;
+
+  if (effectiveFormat) {
+    const assignments = buildAutomaticFixtureAssignments({
+      format: effectiveFormat,
+      teams: teamEntries.map((entry) => {
+        const team = entry.Team as { id?: string; name?: string } | null | undefined;
+        return {
+          id: team?.id ?? entry.teamId,
+          name: team?.name ?? "",
+        };
+      }),
+      matches: normalizedMatchEntries.map((match) => ({
+        id: match.id,
+        round: match.round,
+        groupName: match.groupName,
+        matchLogicIdentifier: match.matchLogicIdentifier,
+        date: match.date,
+        homeTeamId: match.homeTeamId,
+        awayTeamId: match.awayTeamId,
+        homeScore: match.homeScore,
+        awayScore: match.awayScore,
+        isFinished: match.isFinished,
+        createdAt: match.createdAt,
+      })),
+    });
+
+    const assignmentsByMatchId = new Map(assignments.map((assignment) => [assignment.matchId, assignment]));
+
+    normalizedMatchEntries = normalizedMatchEntries.map((match) => {
+      const assignment = assignmentsByMatchId.get(match.id);
+
+      if (!assignment || match.isFinished) {
+        return match;
+      }
+
+      return {
+        ...match,
+        homeTeamId: assignment.homeTeamId,
+        awayTeamId: assignment.awayTeamId,
+      };
+    });
+  }
 
   return {
     id: tournamentRow.id,

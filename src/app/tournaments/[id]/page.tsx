@@ -117,13 +117,13 @@ export default async function TournamentDetailsPage({
       } | null;
     }>;
   };
-  let availableTeams: Array<{ id: string; name: string; establishment: { name: string } }>;
+  let availableTeams: Array<{ id: string; name: string; establishment: { name: string } }> = [];
 
   try {
-    [tournament, availableTeams] = await Promise.all([
-      getTournamentDetail(id),
-      listTeams(),
-    ]);
+    tournament = await getTournamentDetail(id);
+    if (activeTab === "teams") {
+      availableTeams = await listTeams();
+    }
   } catch {
     notFound();
   }
