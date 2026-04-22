@@ -11,8 +11,17 @@ export async function GET() {
     .select("id, name, comuna, createdAt, updatedAt, Team(id)")
     .order("name", { ascending: true });
 
+  type EstablishmentRow = {
+    id: string;
+    name: string;
+    comuna: string | null;
+    createdAt: string;
+    updatedAt: string;
+    Team: Array<{ id: string }> | null;
+  };
+
   const csv = Papa.unparse(
-    (data ?? []).map((e) => ({
+    ((data ?? []) as unknown as EstablishmentRow[]).map((e) => ({
       id: e.id,
       nombre: e.name,
       comuna: e.comuna ?? "",
