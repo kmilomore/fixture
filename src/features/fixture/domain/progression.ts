@@ -10,6 +10,7 @@ type ProgressionMatch = {
   round: number | null;
   groupName: string | null;
   matchLogicIdentifier: string | null;
+  date?: string | null;
   homeTeamId: string | null;
   awayTeamId: string | null;
   homeScore: number | null;
@@ -202,6 +203,12 @@ function buildStageMatchesMap(matches: ProgressionMatch[]) {
     stageMap.set(
       stageName,
       [...stageMatches].sort((left, right) => {
+        const leftDate = left.date ? new Date(left.date).getTime() : Number.POSITIVE_INFINITY;
+        const rightDate = right.date ? new Date(right.date).getTime() : Number.POSITIVE_INFINITY;
+        if (leftDate !== rightDate) {
+          return leftDate - rightDate;
+        }
+
         const leftTime = left.createdAt ? new Date(left.createdAt).getTime() : 0;
         const rightTime = right.createdAt ? new Date(right.createdAt).getTime() : 0;
         if (leftTime !== rightTime) {

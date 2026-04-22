@@ -35,12 +35,26 @@ describe("fixture progression", () => {
       format: "ELIMINATORIA",
       teams,
       matches: [
-        { id: "s1", round: 1, groupName: "Semifinal", matchLogicIdentifier: "Andes vs Bravo", homeTeamId: "a", awayTeamId: "b", homeScore: 2, awayScore: 1, isFinished: true, createdAt: "2026-01-01T10:00:00.000Z" },
-        { id: "s2", round: 1, groupName: "Semifinal", matchLogicIdentifier: "Cobreloa vs BYE", homeTeamId: "c", awayTeamId: null, homeScore: null, awayScore: null, isFinished: false, createdAt: "2026-01-01T10:05:00.000Z" },
-        { id: "f1", round: 2, groupName: "Final", matchLogicIdentifier: "Ganador Semifinal 1 vs Ganador Semifinal 2", homeTeamId: null, awayTeamId: null, homeScore: null, awayScore: null, isFinished: false, createdAt: "2026-01-01T10:10:00.000Z" },
+        { id: "s1", round: 1, groupName: "Semifinal", matchLogicIdentifier: "Andes vs Bravo", date: "2026-01-01T09:00:00.000Z", homeTeamId: "a", awayTeamId: "b", homeScore: 2, awayScore: 1, isFinished: true, createdAt: "2026-01-01T10:00:00.000Z" },
+        { id: "s2", round: 1, groupName: "Semifinal", matchLogicIdentifier: "Cobreloa vs BYE", date: "2026-01-01T11:00:00.000Z", homeTeamId: "c", awayTeamId: null, homeScore: null, awayScore: null, isFinished: false, createdAt: "2026-01-01T10:05:00.000Z" },
+        { id: "f1", round: 2, groupName: "Final", matchLogicIdentifier: "Ganador Semifinal 1 vs Ganador Semifinal 2", date: "2026-01-02T09:00:00.000Z", homeTeamId: null, awayTeamId: null, homeScore: null, awayScore: null, isFinished: false, createdAt: "2026-01-01T10:10:00.000Z" },
       ],
     });
 
     expect(assignments).toEqual([{ matchId: "f1", homeTeamId: "a", awayTeamId: "c" }]);
+  });
+
+  it("keeps semifinal numbering stable using scheduled date even if ids are unordered", () => {
+    const assignments = buildAutomaticFixtureAssignments({
+      format: "ELIMINATORIA",
+      teams,
+      matches: [
+        { id: "zzz", round: 1, groupName: "Semifinal", matchLogicIdentifier: "Andes vs Bravo", date: "2026-01-01T09:00:00.000Z", homeTeamId: "a", awayTeamId: "b", homeScore: 3, awayScore: 1, isFinished: true, createdAt: "2026-01-01T10:00:00.000Z" },
+        { id: "aaa", round: 1, groupName: "Semifinal", matchLogicIdentifier: "Cobreloa vs Deportes Sur", date: "2026-01-01T11:00:00.000Z", homeTeamId: "c", awayTeamId: "d", homeScore: 2, awayScore: 0, isFinished: true, createdAt: "2026-01-01T10:00:00.000Z" },
+        { id: "final", round: 2, groupName: "Final", matchLogicIdentifier: "Ganador Semifinal 1 vs Ganador Semifinal 2", date: "2026-01-02T09:00:00.000Z", homeTeamId: null, awayTeamId: null, homeScore: null, awayScore: null, isFinished: false, createdAt: "2026-01-01T10:10:00.000Z" },
+      ],
+    });
+
+    expect(assignments).toEqual([{ matchId: "final", homeTeamId: "a", awayTeamId: "c" }]);
   });
 });

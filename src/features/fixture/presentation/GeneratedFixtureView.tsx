@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { FileSpreadsheet, FileText, RefreshCw } from "lucide-react";
 import { MatchGroup } from "@/features/fixture/presentation/MatchGroup";
 import { StandingsTable } from "@/features/fixture/presentation/StandingsTable";
@@ -28,6 +29,17 @@ export function GeneratedFixtureView({
   isPending,
   onReset,
 }: GeneratedFixtureViewProps) {
+  const [viewMode, setViewMode] = useState<"all" | "groups" | "knockout">("all");
+  const groupStageEntries = useMemo(
+    () => Object.entries(matchesByGroup).filter(([groupKey]) => groupKey.startsWith("Grupo ")),
+    [matchesByGroup]
+  );
+  const knockoutEntries = useMemo(
+    () => Object.entries(matchesByGroup).filter(([groupKey]) => !groupKey.startsWith("Grupo ")),
+    [matchesByGroup]
+  );
+  const visibleEntries = viewMode === "groups" ? groupStageEntries : viewMode === "knockout" ? knockoutEntries : Object.entries(matchesByGroup);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -72,13 +84,53 @@ export function GeneratedFixtureView({
 
       {standingsByGroup.length > 0 && (
         <div className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700">Vista deportiva</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Revisa posiciones de fase grupal por separado o alterna a llaves eliminatorias cuando el torneo ya cruzó a playoff.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("all")}
+                  className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                    viewMode === "all" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  Todo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("groups")}
+                  className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                    viewMode === "groups" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                  }`}
+                >
+                  Fase grupal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("knockout")}
+                  className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                    viewMode === "knockout" ? "bg-indigo-600 text-white" : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                  }`}
+                >
+                  Eliminatoria
+                </button>
+              </div>
+            </div>
+          </div>
+
           {standingsByGroup.map((group) => (
             <StandingsTable key={group.key} group={group} />
           ))}
         </div>
       )}
 
-      {Object.entries(matchesByGroup).map(([groupKey, groupMatches]) => (
+      {visibleEntries.map(([groupKey, groupMatches]) => (
         <MatchGroup
           key={groupKey}
           tournamentId={tournamentId}
@@ -89,6 +141,18 @@ export function GeneratedFixtureView({
           setEditingMatch={setEditingMatch}
         />
       ))}
+
+      {viewMode === "groups" && groupStageEntries.length === 0 && (
+        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">
+          Este torneo no tiene fase grupal disponible para mostrar.
+        </div>
+      )}
+
+      {viewMode === "knockout" && knockoutEntries.length === 0 && (
+        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">
+          Las llaves eliminatorias todavía no tienen cruces visibles.
+        </div>
+      )}
     </div>
   );
 }

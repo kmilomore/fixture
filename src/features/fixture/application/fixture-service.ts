@@ -32,9 +32,10 @@ async function applyAutomaticFixtureAssignments(input: { tournamentId: string; f
   const [{ data: matches }, { data: teams }] = await Promise.all([
     supabase
       .from("Match")
-      .select("id, round, groupName, matchLogicIdentifier, homeTeamId, awayTeamId, homeScore, awayScore, isFinished, createdAt, status")
+      .select("id, round, groupName, matchLogicIdentifier, date, homeTeamId, awayTeamId, homeScore, awayScore, isFinished, createdAt, status")
       .eq("tournamentId", input.tournamentId)
       .order("round", { ascending: true, nullsFirst: false })
+      .order("date", { ascending: true, nullsFirst: false })
       .order("createdAt", { ascending: true }),
     supabase.from("TournamentTeam").select("teamId, Team(id, name)").eq("tournamentId", input.tournamentId),
   ]);
@@ -44,6 +45,7 @@ async function applyAutomaticFixtureAssignments(input: { tournamentId: string; f
     round: match.round,
     groupName: match.groupName,
     matchLogicIdentifier: match.matchLogicIdentifier,
+    date: match.date,
     homeTeamId: match.homeTeamId,
     awayTeamId: match.awayTeamId,
     homeScore: match.homeScore,

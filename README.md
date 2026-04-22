@@ -56,6 +56,46 @@ Cobertura inicial agregada en esta fase:
 - dominio de standings del fixture;
 - servicios con mocks de Supabase para lecturas y validaciones puntuales.
 
+## Índice de contexto técnico
+
+### Capa app
+
+- `src/app/contex.md`
+- `src/app/disciplines/contex.md`
+- `src/app/establishments/contex.md`
+- `src/app/teams/contex.md`
+- `src/app/tournaments/contex.md`
+- `src/app/tournaments/[id]/contex.md`
+- `src/app/fixture/contex.md`
+- `src/app/settings/contex.md`
+
+### Capa features
+
+- `src/features/contex.md`
+- `src/features/dashboard/contex.md`
+- `src/features/disciplines/contex.md`
+- `src/features/establishments/contex.md`
+- `src/features/teams/contex.md`
+- `src/features/tournaments/contex.md`
+- `src/features/fixture/contex.md`
+
+### Capa infrastructure
+
+- `src/infrastructure/contex.md`
+- `src/infrastructure/database/contex.md`
+- `src/infrastructure/supabase/contex.md`
+
+### Documento técnico principal
+
+- `DOCUMENTATION.md`
+
+El orden recomendado de lectura es:
+
+1. `src/app/contex.md`
+2. `src/features/contex.md`
+3. `src/infrastructure/contex.md`
+4. `DOCUMENTATION.md`
+
 ## Arquitectura actual
 
 La refactorizacion deja el proyecto explicitamente orientado a web y ya consolidado alrededor de servicios compartidos por feature:

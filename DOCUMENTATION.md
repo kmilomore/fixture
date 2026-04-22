@@ -21,8 +21,9 @@ Sistema web de gestión de torneos deportivos. Permite crear torneos, administra
    - [Configuración](#configuración)
 5. [API Routes](#api-routes)
 6. [Librerías internas](#librerías-internas)
-7. [Exportaciones](#exportaciones)
-8. [Despliegue](#despliegue)
+7. [Secuencias de llamadas críticas](#secuencias-de-llamadas-críticas)
+8. [Exportaciones](#exportaciones)
+9. [Despliegue](#despliegue)
 
 ---
 
@@ -576,6 +577,103 @@ Construye la URL completa usando `VERCEL_URL` en producción o `localhost:3000` 
 Seed de datos por defecto. Se ejecuta al iniciar la app si `ENABLE_STARTUP_SYNC=true` (o si no es producción).
 
 Inserta disciplinas y categorías predefinidas usando `INSERT ... ON CONFLICT DO NOTHING` para no duplicar en cada reinicio.
+
+---
+
+## Secuencias de llamadas críticas
+
+### 1. Arranque global y sincronización base
+
+```text
+src/app/layout.tsx
+   -> ensureDefaultCatalogsLoaded()
+      -> src/lib/catalogs.ts
+   -> ensureDefaultEstablishmentsLoaded()
+      -> src/lib/establishments.ts
+         -> sincronización de establecimientos base
+         -> sincronización de equipos base
+   -> render del módulo solicitado
+```
+
+Puntos sensibles:
+
+- cualquier lentitud aquí afecta toda la app;
+- no conviene sumar más trabajo global al layout sin necesidad.
+
+### 2. Creación de torneo y preparación del detalle
+
+```text
+src/app/tournaments/page.tsx
+   -> src/app/actions/tournaments.ts
+      -> src/features/tournaments/application/tournament-service.ts:createTournament()
+         -> src/infrastructure/supabase/client.ts:getSupabase()
+   -> revalidatePath("/tournaments")
+   -> revalidatePath("/")
+
+src/app/tournaments/[id]/page.tsx
+   -> getTournamentDetail()
+   -> listTeams()
+   -> serialización para tabs de Resumen / Equipos / Fixture / Calendario
+```
+
+Puntos sensibles:
+
+- el detalle del torneo es el agregado canónico;
+- exportaciones y UI deben depender de la misma fuente.
+
+### 3. Generación de fixture
+
+```text
+src/app/tournaments/[id]/FixtureEngine.tsx
+   -> src/app/actions/fixture.ts:generateFixture()
+      -> src/features/fixture/application/fixture-service.ts:generateFixture()
+         -> src/features/fixture/domain/fixture-engine.ts:generateFixtureMatches()
+         -> inserción de partidos
+         -> applyAutomaticFixtureAssignments()
+            -> src/features/fixture/domain/progression.ts
+         -> actualización del torneo a SCHEDULED
+```
+
+Puntos sensibles:
+
+- `fixture-engine` resuelve generación y slots;
+- `progression` completa cruces dependientes;
+- no conviene duplicar esta lógica en cliente.
+
+### 4. Registro de resultados y propagación de cruces
+
+```text
+MatchRow.tsx
+   -> src/app/actions/fixture.ts:updateMatchResult()
+      -> src/features/fixture/application/fixture-service.ts:updateMatchResult()
+         -> validación de status, score e incidencia
+         -> persistencia del partido
+         -> applyAutomaticFixtureAssignments()
+            -> standings / progression
+         -> deriveTournamentStatus()
+            -> src/features/tournaments/domain/tournament-lifecycle.ts
+```
+
+Puntos sensibles:
+
+- la progresión posterior es parte del caso de uso;
+- el estado del torneo no debe recalcularse fuera del servicio.
+
+### 5. Exportación PDF y Excel
+
+```text
+UI del detalle del torneo
+   -> /api/tournaments/[id]/export/pdf
+   -> /api/tournaments/[id]/export/excel
+      -> src/lib/tournamentExports.ts:getTournamentFixtureExportData()
+         -> src/features/tournaments/application/tournament-service.ts:getTournamentDetail()
+         -> transformación a estructura exportable común
+```
+
+Puntos sensibles:
+
+- PDF y Excel deben salir del mismo agregado del torneo;
+- no conviene volver a consultas paralelas con otra forma de datos.
 
 ---
 
