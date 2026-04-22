@@ -77,6 +77,12 @@ Aquí convergen:
 - `src/features/fixture/application/fixture-service.ts`
   - persiste formato, generación, reset y actualización de partidos.
 
+- `src/features/fixture/domain/match-lifecycle.ts`
+  - normaliza el estado visible del partido cuando el dato persistido viene ausente o inválido.
+
+- `src/features/tournaments/application/tournament-service.ts`
+  - reconstruye el agregado del torneo y sanea `match.status` a partir de `isFinished` cuando hace falta.
+
 - `src/lib/tournamentExports.ts`
   - toma el agregado del torneo y lo transforma en estructura exportable común para PDF y Excel.
 
@@ -116,8 +122,9 @@ Aquí convergen:
 5. Los controles del fixture deben ser botones explícitos y no submits implícitos.
 6. Si un botón no declara `type="button"`, el navegador puede intentar `POST` contra `/tournaments/[id]?tab=fixture` en vez de ejecutar solo la acción cliente.
 7. Luego de guardar, la vista fuerza refresh para evitar que el estado quede viejo en cliente.
-8. Si el resultado afecta la clasificación grupal o define un ganador, se recalcula la progresión automática.
-9. Luego se recalcula el estado agregado del torneo.
+8. Al reconstruir el detalle, si `status` viene vacío o inválido pero `isFinished` ya es `true`, el agregado expone el partido como `FINISHED`.
+9. Si el resultado afecta la clasificación grupal o define un ganador, se recalcula la progresión automática.
+10. Luego se recalcula el estado agregado del torneo.
 
 ### Vista calendario
 
@@ -153,6 +160,7 @@ Aquí convergen:
 - En componentes cliente hidratados desde SSR, el formateo de fecha con locale o timezone implícitos puede romper la hidratación y disparar errores React difíciles de rastrear.
 - En producción, un botón sin `type="button"` dentro del árbol del detalle puede degradar en un submit HTML y terminar pegándole por `POST` a la ruta de página del torneo.
 - Ese síntoma se ve como "no cambia nada" en la UI aunque el problema real sea de navegación o request equivocada.
+- También puede haber desalineación entre `isFinished` y `status` en datos persistidos o legados; en ese caso la UI puede mostrar marcador finalizado con badge de programado si no se normaliza el agregado.
 - PDF y Excel deben depender del mismo agregado del torneo o divergen muy rápido.
 - La legibilidad operativa mejora cuando la fase grupal y la eliminatoria se pueden leer como superficies distintas.
 - La automatización de llaves depende de que el orden de cruces sea estable; no puede quedar atado a ids o inserciones accidentales.
@@ -166,6 +174,7 @@ Aquí convergen:
 - No mezclar el orden deportivo con el orden calendario.
 - No renderizar fechas con `toLocaleString()` o equivalentes si la salida puede diferir entre servidor y navegador.
 - No dejar botones interactivos sin `type="button"` dentro del flujo de fixture.
+- No asumir que `status` persistido siempre es confiable si `isFinished` indica otra cosa.
 - No depender del orden incidental de creación de partidos para numerar semifinales, cuartos o finales.
 
 ## Ver también

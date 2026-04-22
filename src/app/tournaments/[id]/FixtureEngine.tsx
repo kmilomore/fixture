@@ -30,6 +30,7 @@ const WEEKDAYS = [
 
 export function FixtureEngine({ tournament }: Props) {
   const schedulingRules = tournament.schedulingRules ?? DEFAULT_SCHEDULING_RULES;
+  const hasGroupStandings = buildStandings(tournament).length > 0;
   const [selectedFormat, setSelectedFormat] = useState<FixtureFormat | null>((tournament.format as FixtureFormat) || null);
   const [groupCount, setGroupCount] = useState(1);
   const [seededTeamIds, setSeededTeamIds] = useState<string[]>([]);
@@ -186,6 +187,7 @@ export function FixtureEngine({ tournament }: Props) {
           matchesCount={tournament.matches.length}
           standingsByGroup={standingsByGroup}
           matchesByGroup={matchesByGroup}
+          defaultViewMode={hasGroupStandings ? "groups" : "all"}
           editingMatch={editingMatch}
           setEditingMatch={setEditingMatch}
           isPending={isPending}

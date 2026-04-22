@@ -44,6 +44,7 @@ Tiene dos niveles:
 
 - `src/features/tournaments/application/tournament-service.ts`
   - listado, detalle, CRUD y relaciones con equipos.
+  - normaliza partidos del agregado cuando hay diferencias entre `status` e `isFinished`.
 
 ## Flujos principales
 
@@ -62,7 +63,8 @@ Tiene dos niveles:
 4. Puede separar lectura por fase grupal, eliminatoria y calendario.
 5. Cuando registra resultados, los controles del fixture no deben comportarse como submits HTML implícitos.
 6. El detalle refresca el agregado para reflejar estado y progresión sin quedar con estado cliente viejo.
-7. Desde ahí entra al flujo deportivo de `/tournaments/[id]`.
+7. Si el dato del partido llega inconsistente, el agregado sanea el estado visible antes de serializarlo a la UI.
+8. Desde ahí entra al flujo deportivo de `/tournaments/[id]`.
 
 ### Compatibilidad de esquema
 
@@ -88,6 +90,7 @@ Tiene dos niveles:
 - El detalle del torneo ya no solo genera partidos: ahora también refleja clasificación grupal y progresión automática hacia llaves.
 - La operación real también depende de un calendario legible y de que la edición de partidos refresque la UI con el agregado persistido.
 - Un hallazgo de producción fue que botones sin `type="button"` dentro del detalle pueden disparar requests `POST` a la propia página y simular fallos de actualización de estado.
+- Otro hallazgo fue que el agregado no debe confiar ciegamente en `match.status` cuando `isFinished` ya indica que el partido terminó.
 
 ## Cosas que evitar
 
@@ -96,6 +99,7 @@ Tiene dos niveles:
 - No permitir duplicados de inscripción del mismo equipo.
 - No volver a usar la API propia por HTTP desde la página o actions.
 - No asumir que un botón en un client component es seguro sin declarar su `type` explícitamente.
+- No serializar partidos al cliente sin sanear primero inconsistencias obvias entre `status` e `isFinished`.
 
 ## Ver también
 

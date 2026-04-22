@@ -11,6 +11,28 @@ const teams = [
 ];
 
 describe("fixture progression", () => {
+  it("assigns first and second place from two resolved groups into semifinals", () => {
+    const assignments = buildAutomaticFixtureAssignments({
+      format: "GRUPOS_ELIMINATORIA",
+      teams,
+      matches: [
+        { id: "ga1", round: 1, groupName: "Grupo A", matchLogicIdentifier: "Fecha 1", homeTeamId: "a", awayTeamId: "b", homeScore: 2, awayScore: 0, isFinished: true },
+        { id: "ga2", round: 2, groupName: "Grupo A", matchLogicIdentifier: "Fecha 2", homeTeamId: "a", awayTeamId: "e", homeScore: 1, awayScore: 0, isFinished: true },
+        { id: "ga3", round: 3, groupName: "Grupo A", matchLogicIdentifier: "Fecha 3", homeTeamId: "b", awayTeamId: "e", homeScore: 3, awayScore: 1, isFinished: true },
+        { id: "gb1", round: 1, groupName: "Grupo B", matchLogicIdentifier: "Fecha 1", homeTeamId: "c", awayTeamId: "d", homeScore: 2, awayScore: 1, isFinished: true },
+        { id: "gb2", round: 2, groupName: "Grupo B", matchLogicIdentifier: "Fecha 2", homeTeamId: "c", awayTeamId: "f", homeScore: 1, awayScore: 0, isFinished: true },
+        { id: "gb3", round: 3, groupName: "Grupo B", matchLogicIdentifier: "Fecha 3", homeTeamId: "d", awayTeamId: "f", homeScore: 4, awayScore: 0, isFinished: true },
+        { id: "sf1", round: 4, groupName: "Semifinal", matchLogicIdentifier: "1B vs 2A", homeTeamId: null, awayTeamId: null, homeScore: null, awayScore: null, isFinished: false },
+        { id: "sf2", round: 4, groupName: "Semifinal", matchLogicIdentifier: "1A vs 2B", homeTeamId: null, awayTeamId: null, homeScore: null, awayScore: null, isFinished: false },
+      ],
+    });
+
+    expect(assignments).toEqual([
+      { matchId: "sf1", homeTeamId: "c", awayTeamId: "b" },
+      { matchId: "sf2", homeTeamId: "a", awayTeamId: "d" },
+    ]);
+  });
+
   it("assigns group winners and best second into semifinals for three groups", () => {
     const assignments = buildAutomaticFixtureAssignments({
       format: "GRUPOS_ELIMINATORIA",

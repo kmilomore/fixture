@@ -12,6 +12,7 @@ type GeneratedFixtureViewProps = {
   matchesCount: number;
   standingsByGroup: StandingGroup[];
   matchesByGroup: Record<string, MatchWithTeams[]>;
+  defaultViewMode?: "all" | "groups" | "knockout";
   editingMatch: string | null;
   setEditingMatch: (id: string | null) => void;
   isPending: boolean;
@@ -24,12 +25,13 @@ export function GeneratedFixtureView({
   matchesCount,
   standingsByGroup,
   matchesByGroup,
+  defaultViewMode = "all",
   editingMatch,
   setEditingMatch,
   isPending,
   onReset,
 }: GeneratedFixtureViewProps) {
-  const [viewMode, setViewMode] = useState<"all" | "groups" | "knockout">("all");
+  const [viewMode, setViewMode] = useState<"all" | "groups" | "knockout">(defaultViewMode);
   const groupStageEntries = useMemo(
     () => Object.entries(matchesByGroup).filter(([groupKey]) => groupKey.startsWith("Grupo ")),
     [matchesByGroup]
@@ -88,9 +90,9 @@ export function GeneratedFixtureView({
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700">Vista deportiva</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700">Posiciones y parciales por grupo</h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Revisa posiciones de fase grupal por separado o alterna a llaves eliminatorias cuando el torneo ya cruzó a playoff.
+                  Revisa la tabla parcial de cada grupo y alterna entre resultados grupales, llaves eliminatorias o la vista completa del fixture.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">

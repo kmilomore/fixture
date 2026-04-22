@@ -1,4 +1,5 @@
 import { getSupabase } from "@/infrastructure/supabase/client";
+import { syncAutomaticFixtureAssignments } from "@/features/fixture/application/automatic-assignment-service";
 import {
   isMatchIncidentType,
   normalizeMatchStatus,
@@ -14,7 +15,7 @@ import {
   schedulingRulesToRow,
   type TournamentStatus,
 } from "@/features/tournaments/domain/tournament-lifecycle";
-import type { FixtureSchedulingRules } from "@/features/fixture/domain/fixture-engine";
+import type { FixtureFormat, FixtureSchedulingRules } from "@/features/fixture/domain/fixture-engine";
 import { ServiceError } from "@/shared/lib/service-error";
 
 export type TournamentListItem = {
@@ -371,14 +372,64 @@ export async function getTournamentDetail(id: string) {
   const category = tournamentRow.Category as { id: string; name: string; gender: string } | null;
   const teamsMap = buildTeamsMap(teamEntries);
 
+  if (tournamentRow.format) {
+    const hasResolvableKnockoutPlaceholders = matchEntries.some(
+      (match) =>
+        Boolean(match.matchLogicIdentifier?.includes(" vs ")) &&
+        (!match.homeTeamId || !match.awayTeamId)
+    );
+
+    if (hasResolvableKnockoutPlaceholders) {
+      const assignmentsSynced = await syncAutomaticFixtureAssignments({
+        tournamentId: id,
+        format: tournamentRow.format as FixtureFormat,
+      });
+
+      if (assignmentsSynced) {
+        const refetchMatches = await supabase
+          .from("Match")
+          .select(matchesError && hasMissingTournamentColumns(matchesError) ? MATCH_DETAIL_LEGACY_SELECT : MATCH_DETAIL_SELECT)
+          .eq("tournamentId", id)
+          .order("round", { ascending: true, nullsFirst: false })
+          .order("createdAt", { ascending: true });
+
+        if (refetchMatches.error) {
+          throw refetchMatches.error;
+        }
+
+        matches = refetchMatches.data;
+      }
+    }
+  }
+
+  const normalizedMatchEntries = (matches ?? []) as unknown as Array<{
+    id: string;
+    tournamentId: string;
+    homeTeamId: string | null;
+    awayTeamId: string | null;
+    date: string | null;
+    location: string | null;
+    homeScore: number | null;
+    awayScore: number | null;
+    isFinished: boolean;
+    status?: string;
+    incidentType?: string | null;
+    incidentNotes?: string | null;
+    round: number | null;
+    groupName: string | null;
+    matchLogicIdentifier: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+
   return {
     id: tournamentRow.id,
     name: tournamentRow.name,
     format: tournamentRow.format,
     status: deriveTournamentStatus({
       teamCount: teamEntries.length,
-      matchCount: matchEntries.length,
-      finishedMatchCount: matchEntries.filter((match) => match.isFinished).length,
+      matchCount: normalizedMatchEntries.length,
+      finishedMatchCount: normalizedMatchEntries.filter((match) => match.isFinished).length,
       format: tournamentRow.format,
       status: normalizedStatus,
     }),
@@ -388,7 +439,7 @@ export async function getTournamentDetail(id: string) {
     discipline: { id: discipline?.id ?? "", name: discipline?.name ?? "" },
     category: { id: category?.id ?? "", name: category?.name ?? "", gender: category?.gender ?? "" },
     teams: teamEntries.map((entry) => mapTournamentTeamEntry(entry)),
-    matches: matchEntries.map((match) => ({
+    matches: normalizedMatchEntries.map((match) => ({
       id: match.id,
       tournamentId: match.tournamentId,
       homeTeamId: match.homeTeamId,
