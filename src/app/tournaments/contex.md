@@ -60,8 +60,9 @@ Tiene dos niveles:
 2. Inscribe equipos antes de generar fixture.
 3. Configura formato, grupos, cabezas de serie y reglas calendario.
 4. Puede separar lectura por fase grupal, eliminatoria y calendario.
-5. Cuando registra resultados, el detalle refresca el agregado para reflejar estado y progresión sin quedar con estado cliente viejo.
-6. Desde ahí entra al flujo deportivo de `/tournaments/[id]`.
+5. Cuando registra resultados, los controles del fixture no deben comportarse como submits HTML implícitos.
+6. El detalle refresca el agregado para reflejar estado y progresión sin quedar con estado cliente viejo.
+7. Desde ahí entra al flujo deportivo de `/tournaments/[id]`.
 
 ### Compatibilidad de esquema
 
@@ -86,6 +87,7 @@ Tiene dos niveles:
 - La calidad del selector de inscripción impacta fuertemente la operación cuando el padrón crece.
 - El detalle del torneo ya no solo genera partidos: ahora también refleja clasificación grupal y progresión automática hacia llaves.
 - La operación real también depende de un calendario legible y de que la edición de partidos refresque la UI con el agregado persistido.
+- Un hallazgo de producción fue que botones sin `type="button"` dentro del detalle pueden disparar requests `POST` a la propia página y simular fallos de actualización de estado.
 
 ## Cosas que evitar
 
@@ -93,6 +95,7 @@ Tiene dos niveles:
 - No mezclar aquí la lógica detallada del fixture; eso pertenece a `/tournaments/[id]`.
 - No permitir duplicados de inscripción del mismo equipo.
 - No volver a usar la API propia por HTTP desde la página o actions.
+- No asumir que un botón en un client component es seguro sin declarar su `type` explícitamente.
 
 ## Ver también
 

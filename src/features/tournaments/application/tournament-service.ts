@@ -1,7 +1,7 @@
 import { getSupabase } from "@/infrastructure/supabase/client";
 import {
   isMatchIncidentType,
-  isMatchStatus,
+  normalizeMatchStatus,
   type MatchIncidentType,
   type MatchStatus,
 } from "@/features/fixture/domain/match-lifecycle";
@@ -398,7 +398,7 @@ export async function getTournamentDetail(id: string) {
       homeScore: match.homeScore,
       awayScore: match.awayScore,
       isFinished: match.isFinished,
-      status: isMatchStatus(match.status) ? match.status : "SCHEDULED",
+      status: normalizeMatchStatus(match.status, match.isFinished),
       incidentType: isMatchIncidentType(match.incidentType) ? match.incidentType : null,
       incidentNotes: match.incidentNotes ?? null,
       round: match.round,

@@ -31,6 +31,14 @@ export function isFinishedMatchStatus(status: MatchStatus) {
   return status === "FINISHED" || status === "WALKOVER";
 }
 
+export function normalizeMatchStatus(status: unknown, isFinished: boolean): MatchStatus {
+  if (isMatchStatus(status)) {
+    return status;
+  }
+
+  return isFinished ? "FINISHED" : "SCHEDULED";
+}
+
 export function getMatchStatusPresentation(status: MatchStatus) {
   switch (status) {
     case "LIVE":
