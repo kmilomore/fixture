@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, Edit3 } from "lucide-react";
 import { updateMatchResult } from "@/app/actions/fixture";
 import {
@@ -23,6 +24,7 @@ type MatchRowProps = {
 };
 
 export function MatchRow({ tournamentId, match, isEditing, onEdit, onCancelEdit }: MatchRowProps) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [homeScore, setHomeScore] = useState(match.homeScore?.toString() ?? "");
   const [awayScore, setAwayScore] = useState(match.awayScore?.toString() ?? "");
@@ -32,6 +34,27 @@ export function MatchRow({ tournamentId, match, isEditing, onEdit, onCancelEdit 
   const [incidentNotes, setIncidentNotes] = useState(match.incidentNotes ?? "");
   const [dateTime, setDateTime] = useState(match.date ? new Date(match.date).toISOString().slice(0, 16) : "");
   const requiresScore = status === "FINISHED" || status === "WALKOVER";
+
+  useEffect(() => {
+    setHomeScore(match.homeScore?.toString() ?? "");
+    setAwayScore(match.awayScore?.toString() ?? "");
+    setLocation(match.location ?? "");
+    setStatus(match.status);
+    setIncidentType(match.incidentType ?? "");
+    setIncidentNotes(match.incidentNotes ?? "");
+    setDateTime(match.date ? new Date(match.date).toISOString().slice(0, 16) : "");
+  }, [match]);
+
+  function formatMatchDateLabel(date: string) {
+    const [rawDate, rawTime] = date.split("T");
+    if (!rawDate) {
+      return date;
+    }
+
+    const [year, month, day] = rawDate.split("-");
+    const time = rawTime ? rawTime.slice(0, 5) : "--:--";
+    return `${day}/${month}/${year} ${time}`;
+  }
 
   function handleSave() {
     startTransition(async () => {
@@ -51,6 +74,7 @@ export function MatchRow({ tournamentId, match, isEditing, onEdit, onCancelEdit 
       }
 
       onCancelEdit();
+      router.refresh();
     });
   }
 
@@ -108,7 +132,7 @@ export function MatchRow({ tournamentId, match, isEditing, onEdit, onCancelEdit 
 
       {(match.date || match.location || match.incidentNotes) && !isEditing && (
         <div className="flex gap-3 mt-1 pl-1 text-xs text-slate-400">
-          {match.date && <span>📅 {new Date(match.date).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" })}</span>}
+          {match.date && <span>📅 {formatMatchDateLabel(match.date)}</span>}
           {match.location && <span>📍 {match.location}</span>}
           {match.incidentNotes && <span>📝 {match.incidentNotes}</span>}
         </div>

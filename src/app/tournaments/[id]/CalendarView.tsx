@@ -81,6 +81,39 @@ export function CalendarView({ matches }: { matches: CalendarMatch[] }) {
   const [statusFilter, setStatusFilter] = useState<MatchStatus | "ALL">("ALL");
   const [locationFilter, setLocationFilter] = useState("ALL");
   const [dayFilter, setDayFilter] = useState("ALL");
+  const [selectedMatch, setSelectedMatch] = useState<CalendarMatch | null>(null);
+
+  function getDayKey(date: string | null) {
+    return date ? date.slice(0, 10) : "NO_DATE";
+  }
+
+  function formatDayOption(day: string) {
+    if (day === "NO_DATE") {
+      return "Sin fecha";
+    }
+
+    const [year, month, date] = day.split("-");
+    return `${date}/${month}/${year}`;
+  }
+
+  function formatTimeLabel(date: string | null) {
+    if (!date) {
+      return "Hora por definir";
+    }
+
+    const rawTime = date.split("T")[1] ?? "";
+    return rawTime.slice(0, 5) || "Hora por definir";
+  }
+
+  function formatDateTimeLabel(date: string | null) {
+    if (!date) {
+      return "Sin fecha programada";
+    }
+
+    const [rawDate] = date.split("T");
+    const [year, month, day] = rawDate.split("-");
+    return `${day}/${month}/${year} ${formatTimeLabel(date)}`;
+  }
 
   const locationOptions = useMemo(
     () => Array.from(new Set(matches.map((match) => match.location?.trim()).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b, "es")),
@@ -88,7 +121,7 @@ export function CalendarView({ matches }: { matches: CalendarMatch[] }) {
   );
 
   const dayOptions = useMemo(
-    () => Array.from(new Set(matches.map((match) => match.date ? new Date(match.date).toISOString().slice(0, 10) : "NO_DATE"))),
+    () => Array.from(new Set(matches.map((match) => getDayKey(match.date)))).sort((left, right) => left.localeCompare(right)),
     [matches]
   );
 
@@ -102,7 +135,7 @@ export function CalendarView({ matches }: { matches: CalendarMatch[] }) {
         return false;
       }
 
-      const matchDay = match.date ? new Date(match.date).toISOString().slice(0, 10) : "NO_DATE";
+      const matchDay = getDayKey(match.date);
       if (dayFilter !== "ALL" && matchDay !== dayFilter) {
         return false;
       }
@@ -126,7 +159,7 @@ export function CalendarView({ matches }: { matches: CalendarMatch[] }) {
     }
 
     acc[key].push(match);
-    return acc;
+      return acc;
   }, {});
 
   const scheduledDayKeys = Object.keys(groupedMatches).filter((key) => key !== "Sin fecha").sort((left, right) => left.localeCompare(right));
@@ -184,7 +217,7 @@ export function CalendarView({ matches }: { matches: CalendarMatch[] }) {
               <option value="ALL">Todos</option>
               {dayOptions.map((day) => (
                 <option key={day} value={day}>
-                  {day === "NO_DATE" ? "Sin fecha" : new Intl.DateTimeFormat("es-CL", { dateStyle: "full" }).format(new Date(`${day}T00:00:00`))}
+                    {formatDayOption(day)}
                 </option>
               ))}
             </select>
@@ -220,28 +253,31 @@ export function CalendarView({ matches }: { matches: CalendarMatch[] }) {
                   {day.matches.map((match) => {
                     const statusPresentation = getMatchStatusPresentation(match.status);
                     return (
-                      <article key={match.id} className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 shadow-sm">
+                      <button
+                        key={match.id}
+                        type="button"
+                        onClick={() => setSelectedMatch(match)}
+                        className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition-colors hover:border-slate-300 hover:bg-slate-50"
+                      >
                         <div className="mb-2 flex items-center justify-between gap-2 text-[11px]">
                           <span className="font-semibold uppercase tracking-wide text-slate-600">{getPhaseLabel(match)}</span>
                           <span className={`rounded-full px-2 py-0.5 font-semibold uppercase tracking-wide ${statusPresentation.className}`}>
                             {statusPresentation.label}
                           </span>
                         </div>
-                        <div className="text-[11px] text-slate-500">
-                          {match.date ? new Intl.DateTimeFormat("es-CL", { timeStyle: "short" }).format(new Date(match.date)) : "Hora por definir"}
-                        </div>
+                        <div className="text-[11px] text-slate-500">{formatTimeLabel(match.date)}</div>
                         <div className="mt-2 space-y-1 text-sm">
-                          <div className="font-semibold text-slate-700">{getTeamLabel(match.homeTeam).name}</div>
-                          <div className="text-center font-mono text-xs font-bold text-slate-500">
+                          <div className="truncate font-semibold text-slate-700">{getTeamLabel(match.homeTeam).name}</div>
+                          <div className="text-center font-mono text-xs font-bold text-slate-400">
                             {match.isFinished ? `${match.homeScore ?? 0} - ${match.awayScore ?? 0}` : "vs"}
                           </div>
-                          <div className="font-semibold text-slate-700">{getTeamLabel(match.awayTeam).name}</div>
+                          <div className="truncate font-semibold text-slate-700">{getTeamLabel(match.awayTeam).name}</div>
                         </div>
-                        <div className="mt-2 text-[11px] text-slate-500">{match.location ?? "Lugar por definir"}</div>
+                        <div className="mt-2 truncate text-[11px] text-slate-500">{match.location ?? "Lugar por definir"}</div>
                         {match.incidentType && (
                           <div className="mt-2 text-[11px] font-medium text-amber-700">{getMatchIncidentLabel(match.incidentType)}</div>
                         )}
-                      </article>
+                      </button>
                     );
                   })}
                 </div>
@@ -288,6 +324,57 @@ export function CalendarView({ matches }: { matches: CalendarMatch[] }) {
       {filteredMatches.length === 0 && (
         <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">
           No hay partidos que coincidan con los filtros actuales.
+        </div>
+      )}
+
+      {selectedMatch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" onClick={() => setSelectedMatch(null)}>
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Detalle del evento</p>
+                <h3 className="mt-2 text-lg font-bold text-slate-900">{getPhaseLabel(selectedMatch)}</h3>
+              </div>
+              <button type="button" onClick={() => setSelectedMatch(null)} className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-200">
+                Cerrar
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="grid gap-1 text-sm">
+                <span className="text-slate-500">Partido</span>
+                <span className="font-semibold text-slate-800">{getTeamLabel(selectedMatch.homeTeam).name} vs {getTeamLabel(selectedMatch.awayTeam).name}</span>
+              </div>
+              <div className="grid gap-1 text-sm">
+                <span className="text-slate-500">Fecha y hora</span>
+                <span className="font-semibold text-slate-800">{formatDateTimeLabel(selectedMatch.date)}</span>
+              </div>
+              <div className="grid gap-1 text-sm">
+                <span className="text-slate-500">Lugar</span>
+                <span className="font-semibold text-slate-800">{selectedMatch.location ?? "Lugar por definir"}</span>
+              </div>
+              <div className="grid gap-1 text-sm">
+                <span className="text-slate-500">Estado</span>
+                <span className="font-semibold text-slate-800">{getMatchStatusPresentation(selectedMatch.status).label}</span>
+              </div>
+              <div className="grid gap-1 text-sm">
+                <span className="text-slate-500">Marcador</span>
+                <span className="font-semibold text-slate-800">{selectedMatch.isFinished ? `${selectedMatch.homeScore ?? 0} - ${selectedMatch.awayScore ?? 0}` : "Pendiente"}</span>
+              </div>
+              {selectedMatch.incidentType && (
+                <div className="grid gap-1 text-sm">
+                  <span className="text-slate-500">Incidencia</span>
+                  <span className="font-semibold text-amber-700">{getMatchIncidentLabel(selectedMatch.incidentType)}</span>
+                </div>
+              )}
+              {selectedMatch.incidentNotes && (
+                <div className="grid gap-1 text-sm">
+                  <span className="text-slate-500">Notas</span>
+                  <span className="font-semibold text-slate-800">{selectedMatch.incidentNotes}</span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

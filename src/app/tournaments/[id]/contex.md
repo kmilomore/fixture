@@ -13,10 +13,10 @@ Aquí convergen:
 - inscripción final de participantes;
 - definición de formato y seeds;
 - generación del fixture;
-- tabla de posiciones;
+- vista explícita de fase grupal y tabla de posiciones;
 - progresión automática de cruces;
 - carga de resultados e incidencias;
-- vista calendario;
+- vista calendario en cuadrícula;
 - exportación PDF y Excel.
 
 ## Pestañas y su rol real
@@ -26,9 +26,9 @@ Aquí convergen:
 - `Equipos`
   - inscripción solo antes del fixture.
 - `Fixture`
-  - lógica deportiva: grupos, rondas, standings, cruces y edición de partidos.
+  - lógica deportiva: grupos, standings, cruces, filtros por fase y edición de partidos.
 - `Calendario`
-  - lógica operativa: día real, hora, lugar y filtros.
+  - lógica operativa: cuadrícula semanal por día real, hora, lugar y filtros.
 
 ## Archivos y llamadas relevantes
 
@@ -40,9 +40,12 @@ Aquí convergen:
 
 - `FixtureEngine.tsx`
   - controla formato, grupos, seeds, calendario y generación.
+  - expone la superficie que separa vista grupal, eliminatoria y total.
 
 - `CalendarView.tsx`
-  - ordena los partidos por fecha real y separa nombre del equipo y establecimiento.
+  - pinta un tablero calendario en cuadrícula semanal.
+  - separa partidos programados y partidos sin fecha.
+  - muestra nombre del equipo y establecimiento de forma desacoplada.
 
 - `src/features/fixture/presentation/*`
   - presentación deportiva del fixture.
@@ -55,6 +58,7 @@ Aquí convergen:
 
 - `src/features/fixture/domain/progression.ts`
   - resuelve clasificados y arrastra ganadores hacia cruces siguientes.
+  - usa un orden estable de cruces priorizando fecha programada y luego `createdAt`.
 
 - `src/features/fixture/application/fixture-service.ts`
   - persiste formato, generación, reset y actualización de partidos.
@@ -77,15 +81,17 @@ Aquí convergen:
 ### Fase grupal
 
 1. Los partidos de grupo alimentan `standings`.
-2. La tabla muestra puntos, diferencia y puesto.
-3. Se marcan clasificados según regla actual.
-4. En `GRUPOS_ELIMINATORIA` con 3 grupos clasifican los tres primeros y el mejor segundo.
+2. La vista `Fixture` permite aislar explícitamente la fase grupal.
+3. La tabla muestra puntos, diferencia, puesto y marcas de clasificación.
+4. Se marcan clasificados según regla actual.
+5. En `GRUPOS_ELIMINATORIA` con 3 grupos clasifican los tres primeros y el mejor segundo.
 
 ### Fase eliminatoria
 
 1. `progression` interpreta placeholders como `1A`, `2B`, `Mejor 2°` o `Ganador Semifinal 1`.
 2. Cuando un grupo queda resuelto o una llave tiene ganador, se recalculan asignaciones automáticas.
-3. Los cruces futuros se completan sin intervención manual si todavía no están cerrados.
+3. El orden de referencias como `Ganador Semifinal 1` y `Ganador Semifinal 2` se estabiliza por fecha programada y no por orden incidental de ids.
+4. Los cruces futuros se completan sin intervención manual si todavía no están cerrados.
 
 ### Carga de resultados
 
@@ -93,13 +99,15 @@ Aquí convergen:
 2. `fixture-service` valida el estado del partido.
 3. Solo `FINISHED` y `WALKOVER` aceptan marcador.
 4. Si hay incidencia, la nota es obligatoria.
-5. Luego se recalcula progresión automática y estado agregado del torneo.
+5. Si el resultado afecta la clasificación grupal o define un ganador, se recalcula la progresión automática.
+6. Luego se recalcula el estado agregado del torneo.
 
 ### Vista calendario
 
-1. `CalendarView` reordena partidos por fecha real.
+1. `CalendarView` transforma los partidos con fecha en una cuadrícula semanal por días.
 2. Permite filtrar por estado, lugar y día.
-3. Se usa para operación de sedes y reprogramaciones, no para leer la lógica deportiva.
+3. Los partidos sin fecha quedan fuera de la cuadrícula en un bloque separado.
+4. Se usa para operación de sedes y reprogramaciones, no para leer la lógica deportiva.
 
 ### Exportación
 
@@ -124,6 +132,8 @@ Aquí convergen:
 - La mayor fuente de errores no suele ser la generación inicial sino la progresión posterior al registrar resultados.
 - La separación entre `Fixture` y `Calendario` es correcta: uno responde a lógica deportiva y el otro a operación real.
 - PDF y Excel deben depender del mismo agregado del torneo o divergen muy rápido.
+- La legibilidad operativa mejora cuando la fase grupal y la eliminatoria se pueden leer como superficies distintas.
+- La automatización de llaves depende de que el orden de cruces sea estable; no puede quedar atado a ids o inserciones accidentales.
 
 ## Cosas que evitar
 
@@ -132,6 +142,7 @@ Aquí convergen:
 - No duplicar la lógica de clasificación en componentes cliente.
 - No resolver exportaciones con consultas alternativas a la del detalle.
 - No mezclar el orden deportivo con el orden calendario.
+- No depender del orden incidental de creación de partidos para numerar semifinales, cuartos o finales.
 
 ## Ver también
 

@@ -19,6 +19,7 @@ Tiene dos niveles:
 - creación del torneo con disciplina y categoría válidas;
 - listado y borrado;
 - enlace hacia el centro operativo del detalle;
+- preparación de un flujo deportivo con grupos, seeds y calendario real;
 - compatibilidad con esquemas parcialmente migrados.
 
 ## Archivos y llamadas relevantes
@@ -57,7 +58,8 @@ Tiene dos niveles:
 1. El usuario entra al detalle del torneo.
 2. Inscribe equipos antes de generar fixture.
 3. Configura formato, grupos, cabezas de serie y reglas calendario.
-4. Desde ahí entra al flujo deportivo de `/tournaments/[id]`.
+4. Puede separar lectura por fase grupal, eliminatoria y calendario.
+5. Desde ahí entra al flujo deportivo de `/tournaments/[id]`.
 
 ### Compatibilidad de esquema
 
@@ -80,6 +82,7 @@ Tiene dos niveles:
 - Este módulo dejó de ser solo alta/baja de torneos; es el puente entre maestros y operación real.
 - La compatibilidad con esquema legado sigue siendo importante para no romper listados o detalles en despliegues intermedios.
 - La calidad del selector de inscripción impacta fuertemente la operación cuando el padrón crece.
+- El detalle del torneo ya no solo genera partidos: ahora también refleja clasificación grupal y progresión automática hacia llaves.
 
 ## Cosas que evitar
 
