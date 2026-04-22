@@ -10,7 +10,7 @@ import {
   MATCH_STATUSES,
   type MatchIncidentType,
   type MatchStatus,
-} from "@/lib/matchLifecycle";
+} from "@/features/fixture/domain/match-lifecycle";
 import { getPlaceholderTeams } from "@/features/fixture/domain/standings";
 import type { MatchWithTeams } from "@/features/fixture/types";
 

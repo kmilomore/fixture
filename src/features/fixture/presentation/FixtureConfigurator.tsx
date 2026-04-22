@@ -1,7 +1,7 @@
 "use client";
 
 import { Trophy, Zap } from "lucide-react";
-import type { FixtureFormat } from "@/lib/fixtureEngine";
+import type { FixtureFormat } from "@/features/fixture/domain/fixture-engine";
 
 type WeekdayOption = {
   value: number;

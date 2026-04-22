@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requestServerApi } from "@/lib/serverApi";
+import {
+  createTeam as createTeamService,
+  deleteTeam as deleteTeamService,
+} from "@/features/teams/application/team-service";
+import { asServiceError } from "@/shared/lib/service-error";
 
 export async function createTeam(formData: FormData) {
   const name = formData.get("name") as string;
@@ -12,37 +16,24 @@ export async function createTeam(formData: FormData) {
   }
 
   try {
-    const response = await requestServerApi<{ id: string }>("/api/teams", {
-      method: "POST",
-      body: JSON.stringify({ name, establishmentId }),
-    });
-
-    if (!response.ok) {
-      return { error: (response.body as { error?: string } | null)?.error ?? "Error al crear el equipo." };
-    }
+    await createTeamService({ name, establishmentId });
 
     revalidatePath("/teams");
     revalidatePath("/establishments");
     return { success: true };
-  } catch {
-    return { error: "Error al crear el equipo." };
+  } catch (error) {
+    return { error: asServiceError(error, "Error al crear el equipo.").message };
   }
 }
 
 export async function deleteTeam(id: string) {
   try {
-    const response = await requestServerApi<{ success: true }>(`/api/teams/${id}`, {
-      method: "DELETE",
-    });
-
-    if (!response.ok) {
-      return { error: (response.body as { error?: string } | null)?.error ?? "Error al eliminar el equipo." };
-    }
+    await deleteTeamService(id);
 
     revalidatePath("/teams");
     revalidatePath("/establishments");
     return { success: true };
-  } catch {
-    return { error: "Error al eliminar el equipo." };
+  } catch (error) {
+    return { error: asServiceError(error, "Error al eliminar el equipo.").message };
   }
 }

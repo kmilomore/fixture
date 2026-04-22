@@ -3,6 +3,10 @@ import path from "path";
 import type { PoolClient } from "pg";
 import Papa from "papaparse";
 import postgres from "@/lib/postgres";
+import {
+  normalizeComuna,
+  normalizeEstablishmentName,
+} from "@/features/establishments/domain/establishment-normalization";
 
 const DEFAULT_ESTABLISHMENTS_CSV = "formacion_directorio_territorio.csv";
 
@@ -39,16 +43,6 @@ declare global {
     | undefined;
 }
 
-export function normalizeEstablishmentName(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
 export function dedupeEstablishmentNames(names: string[]) {
   const seen = new Set<string>();
   const uniqueNames: string[] = [];
@@ -69,11 +63,6 @@ export function dedupeEstablishmentNames(names: string[]) {
   }
 
   return uniqueNames;
-}
-
-export function normalizeComuna(value: string | null | undefined) {
-  const comuna = value?.trim();
-  return comuna ? comuna : null;
 }
 
 function chooseCanonicalEstablishment<T extends { comuna: string | null; createdAt: Date; id: string }>(

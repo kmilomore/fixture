@@ -1,6 +1,6 @@
-import type { MatchIncidentType, MatchStatus } from "@/lib/matchLifecycle";
-import type { FixtureSchedulingRules } from "@/lib/fixtureEngine";
-import type { TournamentStatus } from "@/lib/tournamentLifecycle";
+import type { MatchIncidentType, MatchStatus } from "@/features/fixture/domain/match-lifecycle";
+import type { FixtureSchedulingRules } from "@/features/fixture/domain/fixture-engine";
+import type { TournamentStatus } from "@/features/tournaments/domain/tournament-lifecycle";
 
 export type FixtureTeamView = {
   id: string;

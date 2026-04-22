@@ -1,8 +1,13 @@
 "use server";
 
-import { normalizeCatalogName } from "@/lib/catalogs";
 import { revalidatePath } from "next/cache";
-import { requestServerApi } from "@/lib/serverApi";
+import {
+  createCategory as createCategoryService,
+  createDiscipline as createDisciplineService,
+  deleteCategory as deleteCategoryService,
+  deleteDiscipline as deleteDisciplineService,
+} from "@/features/disciplines/application/catalog-service";
+import { asServiceError } from "@/shared/lib/service-error";
 
 export async function createDiscipline(formData: FormData) {
   const name = formData.get("name") as string;
@@ -12,38 +17,25 @@ export async function createDiscipline(formData: FormData) {
   }
 
   try {
-    const response = await requestServerApi<{ id: string }>("/api/disciplines", {
-      method: "POST",
-      body: JSON.stringify({ name: name.trim() }),
-    });
-
-    if (!response.ok) {
-      return { error: (response.body as { error?: string } | null)?.error ?? "Error al crear disciplina" };
-    }
+    await createDisciplineService({ name: name.trim() });
 
     revalidatePath("/disciplines");
     revalidatePath("/tournaments");
     return { success: true };
-  } catch {
-    return { error: "Error al crear disciplina" };
+  } catch (error) {
+    return { error: asServiceError(error, "Error al crear disciplina").message };
   }
 }
 
 export async function deleteDiscipline(id: string) {
   try {
-    const response = await requestServerApi<{ success: true }>(`/api/disciplines/${id}`, {
-      method: "DELETE",
-    });
-
-    if (!response.ok) {
-      return { error: (response.body as { error?: string } | null)?.error ?? "Error al eliminar" };
-    }
+    await deleteDisciplineService(id);
 
     revalidatePath("/disciplines");
     revalidatePath("/tournaments");
     return { success: true };
-  } catch {
-    return { error: "Error al eliminar" };
+  } catch (error) {
+    return { error: asServiceError(error, "Error al eliminar").message };
   }
 }
 
@@ -56,37 +48,24 @@ export async function createCategory(formData: FormData) {
   }
 
   try {
-    const response = await requestServerApi<{ id: string }>("/api/categories", {
-      method: "POST",
-      body: JSON.stringify({ name: name.trim(), gender: gender.trim() }),
-    });
-
-    if (!response.ok) {
-      return { error: (response.body as { error?: string } | null)?.error ?? "Error al crear la categoría" };
-    }
+    await createCategoryService({ name: name.trim(), gender: gender.trim() });
 
     revalidatePath("/disciplines");
     revalidatePath("/tournaments");
     return { success: true };
-  } catch {
-    return { error: "Error al crear la categoría" };
+  } catch (error) {
+    return { error: asServiceError(error, "Error al crear la categoría").message };
   }
 }
 
 export async function deleteCategory(id: string) {
   try {
-    const response = await requestServerApi<{ success: true }>(`/api/categories/${id}`, {
-      method: "DELETE",
-    });
-
-    if (!response.ok) {
-      return { error: (response.body as { error?: string } | null)?.error ?? "Error al eliminar la categoría" };
-    }
+    await deleteCategoryService(id);
 
     revalidatePath("/disciplines");
     revalidatePath("/tournaments");
     return { success: true };
-  } catch {
-    return { error: "Error al eliminar la categoría" };
+  } catch (error) {
+    return { error: asServiceError(error, "Error al eliminar la categoría").message };
   }
 }

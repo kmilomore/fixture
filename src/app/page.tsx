@@ -1,5 +1,5 @@
 import { Trophy, Users, Building2, Activity } from "lucide-react";
-import { fetchServerApi } from "@/lib/serverApi";
+import { getDashboardStats } from "@/features/dashboard/application/dashboard-service";
 
 export default async function DashboardPage() {
   let establishmentsCount = 0;
@@ -9,12 +9,7 @@ export default async function DashboardPage() {
   let dataUnavailable = false;
 
   try {
-    const dashboard = await fetchServerApi<{
-      establishments: number;
-      teams: number;
-      tournaments: number;
-      matches: number;
-    }>("/api/dashboard");
+    const dashboard = await getDashboardStats();
     establishmentsCount = dashboard.establishments;
     teamsCount = dashboard.teams;
     tournamentsCount = dashboard.tournaments;

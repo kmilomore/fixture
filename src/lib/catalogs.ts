@@ -1,4 +1,5 @@
 import postgres from "@/lib/postgres";
+import { normalizeCatalogName } from "@/features/disciplines/domain/catalog-normalization";
 
 const DEFAULT_DISCIPLINES = [
   "Fútbol",
@@ -17,16 +18,6 @@ declare global {
   var catalogsSyncPromise:
     | Promise<void>
     | undefined;
-}
-
-export function normalizeCatalogName(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
-    .replace(/\s+/g, " ");
 }
 
 function buildCategoryKey(name: string, gender: string) {

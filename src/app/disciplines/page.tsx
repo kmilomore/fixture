@@ -1,7 +1,7 @@
 import { Layers, Medal, Tags } from "lucide-react";
 import { AddDisciplineForm, AddCategoryForm } from "./Forms";
 import { DeleteDisciplineButton, DeleteCategoryButton } from "./DeleteButtons";
-import { fetchServerApi } from "@/lib/serverApi";
+import { listCatalogs } from "@/features/disciplines/application/catalog-service";
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +9,7 @@ export default async function DisciplinesPage() {
   let disciplines: Array<{ id: string; name: string; createdAt: string; updatedAt: string }> = [];
   let categories: Array<{ id: string; name: string; gender: string; createdAt: string; updatedAt: string }> = [];
   try {
-    const data = await fetchServerApi<{ disciplines: typeof disciplines; categories: typeof categories }>("/api/disciplines");
+    const data = await listCatalogs();
     disciplines = data.disciplines;
     categories = data.categories;
   } catch {}

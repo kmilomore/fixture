@@ -1,6 +1,7 @@
 import { Users, Shield, Building2 } from "lucide-react";
 import { NewTeamForm, DeleteTeamButton } from "./Components";
-import { fetchServerApi } from "@/lib/serverApi";
+import { listEstablishments } from "@/features/establishments/application/establishment-service";
+import { listTeams } from "@/features/teams/application/team-service";
 
 export const dynamic = 'force-dynamic';
 
@@ -23,8 +24,8 @@ export default async function TeamsPage() {
   }> = [];
   try {
     [teams, establishments] = await Promise.all([
-      fetchServerApi<typeof teams>("/api/teams"),
-      fetchServerApi<typeof establishments>("/api/establishments"),
+      listTeams(),
+      listEstablishments(),
     ]);
   } catch {}
 

@@ -4,7 +4,7 @@ import CsvImporter from "./CsvImporter";
 import ExportEstablishmentsButton from "./ExportEstablishmentsButton";
 import EstablishmentsTable from "./EstablishmentsTable";
 import { establishmentsContext } from "./context";
-import { fetchServerApi } from "@/lib/serverApi";
+import { listEstablishments } from "@/features/establishments/application/establishment-service";
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +17,7 @@ export default async function EstablishmentsPage() {
     teamsCount: number;
   }> = [];
   try {
-    tableRows = await fetchServerApi("/api/establishments");
+    tableRows = await listEstablishments();
   } catch {}
 
   return (
