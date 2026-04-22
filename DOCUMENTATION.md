@@ -33,8 +33,8 @@ src/
 ├── app/
 │   ├── layout.tsx              # Layout raiz: sidebar + header
 │   ├── page.tsx                # Dashboard (/)
-│   ├── api/                    # API Routes (Route Handlers)
-│   ├── actions/                # Server Actions existentes
+│   ├── api/                    # API Routes finas
+│   ├── actions/                # Server Actions finas
 │   ├── tournaments/
 │   ├── establishments/
 │   ├── teams/
@@ -43,17 +43,64 @@ src/
 │   └── settings/
 ├── components/                 # UI compartida
 ├── features/                   # Dominio por modulo
+│   ├── dashboard/
+│   │   └── application/
+│   ├── disciplines/
+│   │   ├── domain/
+│   │   └── application/
+│   ├── establishments/
+│   │   ├── domain/
+│   │   └── application/
 │   ├── fixture/
-│   │   └── domain/
+│   │   ├── domain/
+│   │   ├── application/
+│   │   └── presentation/
+│   ├── teams/
+│   │   └── application/
 │   └── tournaments/
-│       └── domain/
+│       ├── domain/
+│       └── application/
 ├── infrastructure/             # Adaptadores concretos
 │   ├── database/
 │   └── supabase/
-└── lib/                        # Compatibilidad temporal mientras migra la app
+└── lib/                        # Compatibilidad legacy residual
 ```
 
-La aplicacion queda oficialmente orientada a web. Electron se elimina como objetivo de ejecucion y `src/lib` pasa a ser una capa de transicion mientras la logica se mueve a `features/` e `infrastructure/`.
+La aplicacion queda oficialmente orientada a web. Electron se elimina como objetivo de ejecucion y la logica central ya vive en `features/` e `infrastructure/`. `src/lib` queda solo para compatibilidad residual y utilidades legacy puntuales.
+
+Reglas arquitectonicas vigentes:
+
+- las paginas server consumen servicios compartidos, no rutas HTTP internas;
+- las server actions consumen servicios compartidos, no la propia API;
+- las API routes funcionan como adaptadores finos;
+- `src/features/*` ya no depende de `@/lib/*`.
+
+---
+
+## Testing
+
+El proyecto incorpora Vitest para cubrir dominio y servicios puros o con mocks de infraestructura.
+
+### Comandos
+
+```bash
+npm test
+npm run test:watch
+```
+
+### Cobertura inicial agregada
+
+- `src/features/dashboard/application/dashboard-service.test.ts`
+- `src/features/disciplines/application/catalog-service.test.ts`
+- `src/features/fixture/domain/standings.test.ts`
+- `src/features/disciplines/domain/catalog-normalization.test.ts`
+- `src/features/establishments/domain/establishment-normalization.test.ts`
+
+Objetivo de esta primera base:
+
+- validar logica de dominio sin framework UI;
+- probar servicios con mocks de Supabase;
+- dejar una base de crecimiento para nuevas suites por feature.
 
 ---
 
@@ -203,7 +250,7 @@ Pantalla de inicio con tarjetas de estadísticas del sistema.
 - Total de torneos
 - Total de partidos
 
-Los datos se obtienen de `/api/dashboard` que hace 4 queries en paralelo con `count: 'exact'` de Supabase.
+Los datos se obtienen a traves de `src/features/dashboard/application/dashboard-service.ts`. La pagina `/` y `GET /api/dashboard` reutilizan el mismo servicio.
 
 Si la API falla, muestra un estado de error con el mensaje "La base de datos todavia no responde con la estructura esperada".
 
@@ -231,7 +278,7 @@ Gestión de instituciones participantes (colegios, clubes deportivos).
 - `ExportEstablishmentsButton.tsx` — descarga CSV
 
 **Importación CSV:**  
-Acepta archivos con columnas `nombre` y `comuna`. La lógica de deduplicación en `src/lib/establishments.ts` normaliza nombres (minúsculas, sin tildes, sin caracteres especiales) antes de comparar, evitando duplicados por diferencias tipográficas. Al crear un establecimiento nuevo via importación, se crea automáticamente un equipo base con el mismo nombre.
+Acepta archivos con columnas `nombre` y `comuna`. La deduplicación usa normalización compartida en `src/features/establishments/domain/establishment-normalization.ts`. Al crear un establecimiento nuevo via importación, se crea automáticamente un equipo base con el mismo nombre.
 
 **API:**  
 `GET /api/establishments` — retorna lista con campo `teamsCount` (conteo de equipos por establecimiento)  

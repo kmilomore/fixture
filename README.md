@@ -36,24 +36,65 @@ npm run dev
 
 La aplicacion queda disponible en `http://localhost:3000`.
 
-## Arquitectura inicial
+## Tests
 
-La fase 1 de refactorizacion deja el proyecto explicitamente orientado a web y abre una estructura limpia sin romper imports existentes:
+La base de pruebas usa Vitest con entorno Node.
+
+```bash
+npm test
+```
+
+Modo watch:
+
+```bash
+npm run test:watch
+```
+
+Cobertura inicial agregada en esta fase:
+
+- dominio puro de normalizacion;
+- dominio de standings del fixture;
+- servicios con mocks de Supabase para lecturas y validaciones puntuales.
+
+## Arquitectura actual
+
+La refactorizacion deja el proyecto explicitamente orientado a web y ya consolidado alrededor de servicios compartidos por feature:
 
 ```text
 src/
 	app/                # Rutas, layouts y componentes de pagina
+		api/            # Adaptadores HTTP finos
+		actions/        # Server actions finas
 	components/         # Componentes compartidos de UI
-	features/           # Dominio y casos de uso por modulo
+	features/           # Dominio, servicios y presentacion por modulo
+		dashboard/
+			tapplication/
+		disciplines/
+			domain/
+			application/
+		establishments/
+			domain/
+			application/
 		fixture/
 			domain/
+			application/
+			presentation/
+		teams/
+			application/
 		tournaments/
 			domain/
+			application/
 	infrastructure/     # Adaptadores concretos a BD y servicios externos
 		database/
 		supabase/
-	lib/                # Capa de compatibilidad temporal
+	lib/                # Compatibilidad legacy residual
 ```
+
+Regla aplicada en esta fase:
+
+- sin HTTP interno entre paginas/actions y la propia API;
+- paginas server consumen servicios compartidos;
+- routes y actions quedan como adaptadores finos.
 
 ## Base de datos
 

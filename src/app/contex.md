@@ -18,8 +18,8 @@ La carpeta raíz de `src/app` concentra el layout general, el dashboard principa
 
 - `page.tsx`
   - Dashboard general.
-  - Muestra conteos de establecimientos, equipos y torneos.
-  - Actualmente deja `Partidos Jugados` fijo en `0`.
+  - Muestra conteos de establecimientos, equipos, torneos y partidos.
+  - Consume `getDashboardStats()` desde `src/features/dashboard/application/dashboard-service.ts`.
 
 - `globals.css`
   - Estilos globales mínimos.
@@ -40,19 +40,21 @@ Esto significa que el módulo raíz actúa como punto de entrada operativo para 
 - `src/lib/catalogs.ts`
 - `src/lib/establishments.ts`
 - `src/components/layout/Sidebar.tsx`
+- `src/features/dashboard/application/dashboard-service.ts`
 
 ## Endpoints HTTP del módulo raíz
 
 - `GET /api/dashboard`
-  - devuelve conteos generales de establecimientos, equipos, torneos y partidos.
+  - devuelve conteos generales reutilizando el servicio compartido del dashboard.
 
 ## Nota arquitectónica actual
 
-- La app usa PostgreSQL nativo vía `pg` como capa interna de acceso a datos del servidor.
-- La exposición para frontend o integraciones se apoya en rutas `src/app/api/**` y helpers HTTP del servidor.
+- La app mezcla Supabase y SQL directo según el caso de uso, pero las páginas server y server actions ya no consumen la propia API por HTTP interno.
+- La exposición para frontend o integraciones se apoya en rutas `src/app/api/**`, mientras la lógica de aplicación vive en `src/features/**/application`.
+- Existe una base inicial de tests con Vitest para dominio y servicios.
 
 ## Hallazgos
 
 - El layout no es solo visual; también ejecuta lógica de sincronización de datos.
 - Si la sincronización se vuelve lenta, impacta el tiempo de carga inicial de toda la app.
-- El dashboard aún no consulta partidos jugados reales; hoy es una tarjeta placeholder.
+- El dashboard ya comparte servicio con la API, pero la sincronización global del layout sigue siendo un punto sensible de arranque.
