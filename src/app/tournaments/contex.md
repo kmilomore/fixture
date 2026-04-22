@@ -7,156 +7,90 @@
 
 ## Propósito
 
-Este módulo administra la vida completa de un torneo:
+Este módulo es la puerta de entrada al negocio deportivo real.
 
-- creación;
-- eliminación;
-- selección de disciplina y categoría;
-- búsqueda, selección e inscripción de escuelas/equipos;
-- acceso al motor de fixture;
-- configuración de formatos avanzados, grupos y calendario automático.
+Tiene dos niveles:
 
-## Archivos clave
+- nivel macro: crear, listar y eliminar torneos;
+- nivel operativo: derivar al detalle donde vive la gestión del torneo concreto.
+
+## Qué resuelve este módulo
+
+- creación del torneo con disciplina y categoría válidas;
+- listado y borrado;
+- enlace hacia el centro operativo del detalle;
+- compatibilidad con esquemas parcialmente migrados.
+
+## Archivos y llamadas relevantes
 
 - `page.tsx`
-  - Lista torneos existentes.
-  - Obtiene disciplinas y categorías para el formulario de alta.
-  - Si la carga del listado falla, muestra una advertencia visible en vez de quedar silenciosamente vacía.
+  - carga torneos, disciplinas y categorías.
+  - muestra errores visibles de carga.
 
 - `Components.tsx`
-  - `NewTournamentForm`
-  - `DeleteTournamentButton`
+  - formulario de alta y botón de baja.
 
 - `../actions/tournaments.ts`
-  - acciones de creación, eliminación y manejo de equipos dentro del torneo.
-
-- `[id]/page.tsx`
-  - detalle del torneo.
-
-- `[id]/ClientComponents.tsx`
-  - gestión de inscripción y baja de equipos.
-  - buscador por nombre de escuela o equipo.
-  - selector controlado para evitar pérdidas de selección.
-
-- `[id]/FixtureEngine.tsx`
-  - configurador y visualización del fixture.
+  - llama a `src/features/tournaments/application/tournament-service.ts`.
+  - también coordina inscripción y remoción de equipos.
 
 - `../api/tournaments/route.ts`
-  - listado y alta HTTP de torneos.
-  - incorpora fallback entre esquema nuevo y esquema legado si todavía faltan columnas de calendarización.
+  - `GET` y `POST` HTTP.
 
 - `../api/tournaments/[id]/route.ts`
-  - detalle, edición y baja HTTP de un torneo.
-  - incorpora fallback para cargar torneos y partidos aunque la base aún no tenga todas las columnas nuevas.
+  - detalle, edición y eliminación vía HTTP.
 
-## Flujos de trabajo
+- `src/features/tournaments/application/tournament-service.ts`
+  - listado, detalle, CRUD y relaciones con equipos.
 
-### Creación de torneo
+## Flujos principales
 
-1. El usuario abre el formulario.
-2. Indica nombre, disciplina y categoría.
-3. Si faltan catálogos, la UI bloquea la creación.
-4. La server action crea el torneo y revalida dashboard y listado.
-5. Si la base todavía no tiene columnas nuevas de scheduling, el alta puede seguir operando por la ruta de compatibilidad legada.
+### Creación del torneo
 
-### Gestión de equipos dentro del torneo
+1. La UI requiere nombre, disciplina y categoría.
+2. La action delega al servicio.
+3. El servicio inserta y aplica fallback si faltan columnas nuevas en el esquema.
+4. Se revalida dashboard y listado.
 
-1. En `/tournaments/[id]`, si el fixture no fue generado, se muestra `ManageTournamentTeams`.
-2. La columna izquierda muestra un buscador y un selector de escuelas/equipos aún no inscritos.
-3. El usuario puede escribir parte del nombre de la escuela o del equipo para reducir el listado.
-4. El selector muestra cada opción como `Escuela · Equipo` para facilitar la lectura.
-5. Tras seleccionar una opción, la UI muestra un resumen breve del seleccionado.
-6. El botón `Agregar al torneo` inserta la relación y limpia la búsqueda.
-7. Se pueden quitar relaciones antes de generar el fixture.
+### Preparación para operar
 
-### Flujo esperado del selector de escuelas/equipos
+1. El usuario entra al detalle del torneo.
+2. Inscribe equipos antes de generar fixture.
+3. Configura formato, grupos, cabezas de serie y reglas calendario.
+4. Desde ahí entra al flujo deportivo de `/tournaments/[id]`.
 
-1. El usuario entra al detalle del torneo en estado `DRAFT`.
-2. Escribe el nombre de la escuela en el buscador.
-3. El listado se filtra por coincidencias en nombre del establecimiento o del equipo.
-4. El usuario selecciona la opción correcta en el dropdown.
-5. La UI confirma visualmente cuál quedó seleccionada.
-6. Al agregarla, desaparece del listado de disponibles y pasa a participantes.
+### Compatibilidad de esquema
 
-### Qué debe hacer esta sección
+1. Si faltan columnas nuevas de scheduling o match status, el servicio usa selects legados.
+2. La UI sigue operando con degradación controlada.
 
-- Permitir encontrar rápido una escuela aunque existan muchas cargadas.
-- Mantener visible y estable la selección elegida.
-- Evitar que el selector desborde su columna o quede detrás del bloque de formato.
-- Impedir la inscripción duplicada del mismo equipo dentro del torneo.
-
-### Qué se debe evitar
-
-- No depender de un `select` no controlado cuando la lista es larga.
-- No permitir que el layout del formulario empuje el panel de fixture.
-- No mostrar en el dropdown equipos ya inscritos en el torneo.
-- No permitir generar fixture si no hay al menos dos equipos.
-
-### Transición a fixture
-
-1. Se elige formato.
-2. Si corresponde, se define cantidad de grupos.
-3. Se define el calendario disponible: rango de fechas, días y franja horaria.
-4. Se generan partidos y se les asignan slots automáticamente.
-5. El estado del torneo cambia a `SCHEDULED` cuando el fixture se genera; luego puede pasar a `PLAYING`, `PAUSED`, `FINISHED` o `CANCELLED` según el avance real.
-6. Desde ese punto la UI ya no muestra la edición de inscripciones sino el listado de participantes y el motor del fixture.
-
-## Compatibilidad y resiliencia
-
-- El listado y el detalle de torneos toleran esquemas de base parcialmente migrados.
-- Si faltan columnas nuevas como las de scheduling, las rutas API retroceden a un `select` legado en vez de romper toda la pantalla.
-- Esta compatibilidad evita inconsistencias donde el dashboard cuenta filas existentes pero el módulo de torneos no puede renderizarlas por error de consulta.
-- La pantalla de `/tournaments` ya no oculta errores de carga con un `catch {}` vacío: ahora deja una señal visible para diagnóstico.
-- En el dashboard se corrigió el texto del indicador de torneos: el valor mostrado representa torneos registrados, no necesariamente torneos activos.
-
-## APIs y acciones disponibles
-
-API HTTP de torneos:
-
-- `GET /api/tournaments`
-- `POST /api/tournaments`
-- `GET /api/tournaments/:id`
-- `PATCH /api/tournaments/:id`
-- `DELETE /api/tournaments/:id`
-- `GET /api/tournaments/:id/teams`
-- `POST /api/tournaments/:id/teams`
-- `DELETE /api/tournaments/:id/teams/:teamEntryId`
-
-Rutas API de exportación del fixture:
-
-- `/api/tournaments/[id]/export/pdf`
-- `/api/tournaments/[id]/export/excel`
-
-Acciones server heredadas:
-
-- `createTournament(formData)`
-- `deleteTournament(id)`
-- `addTeamToTournament(tournamentId, teamId)`
-- `removeTeamFromTournament(id, tournamentId)`
-
-Acciones relacionadas desde el motor de fixture:
-
-- `setTournamentFormat(...)`
-- `generateFixture(...)`
-- `resetFixture(...)`
-- `updateMatchResult(...)`
-
-## Dependencias
+## Relaciones con otros módulos
 
 - `disciplines`
+  - define los catálogos necesarios para crear torneos.
 - `teams`
-- `fixture`
+  - aporta los equipos inscribibles.
 - `establishments`
-  - aporta el nombre visible de la escuela en el selector.
+  - aporta el nombre institucional visible del selector de equipos.
+- `tournaments/[id]`
+  - concentra el trabajo deportivo y operativo real.
 
 ## Hallazgos
 
-- El módulo está dividido correctamente entre listado, detalle y motor de partidos.
-- La UI asume que la inscripción de equipos termina antes de generar el fixture.
-- No existe aún una política explícita para pasar de `PLAYING` a `FINISHED`.
-- La búsqueda por escuela es necesaria porque el directorio base puede ser grande.
-- El texto visible del selector debe priorizar el nombre de la escuela para que la selección sea más intuitiva.
-- El comportamiento correcto de esta sección depende de mantener el selector como componente controlado.
-- El módulo ya no solo crea torneos: ahora también resuelve la calendarización operativa del fixture.
-- La API HTTP permite desacoplar frontend, automatizaciones o clientes externos del acceso directo a PostgreSQL.
-- Una falla silenciosa en el listado puede ocultar torneos existentes aunque el dashboard los siga contando; por eso el módulo ahora prioriza degradación controlada y mensajes visibles.
+- Este módulo dejó de ser solo alta/baja de torneos; es el puente entre maestros y operación real.
+- La compatibilidad con esquema legado sigue siendo importante para no romper listados o detalles en despliegues intermedios.
+- La calidad del selector de inscripción impacta fuertemente la operación cuando el padrón crece.
+
+## Cosas que evitar
+
+- No dejar errores silenciosos en el listado.
+- No mezclar aquí la lógica detallada del fixture; eso pertenece a `/tournaments/[id]`.
+- No permitir duplicados de inscripción del mismo equipo.
+- No volver a usar la API propia por HTTP desde la página o actions.
+
+## Ver también
+
+- `src/app/contex.md`
+- `src/app/disciplines/contex.md`
+- `src/app/teams/contex.md`
+- `src/app/tournaments/[id]/contex.md`

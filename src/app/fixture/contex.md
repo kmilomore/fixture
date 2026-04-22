@@ -6,37 +6,56 @@
 
 ## Propósito
 
-Actúa como hub de navegación rápida hacia los módulos principales relacionados con la operación deportiva:
+Hoy este módulo no es el motor del fixture; es una puerta de entrada operativa.
+
+Su función real es orientar al usuario hacia:
 
 - torneos;
 - establecimientos;
 - equipos;
 - disciplinas y categorías.
 
-## Archivos clave
+## Naturaleza del módulo
+
+Es un módulo satélite de navegación.
+
+No concentra reglas deportivas ni consultas complejas. La operación verdadera del fixture vive en `/tournaments/[id]`.
+
+## Archivo clave
 
 - `page.tsx`
-  - no consulta base de datos;
-  - presenta tarjetas de acceso rápido a los módulos operativos.
+  - no llama servicios de datos;
+  - renderiza tarjetas de acceso rápido;
+  - resume el mapa deportivo del sistema.
 
-## Flujos de trabajo
-
-### Navegación operativa
+## Flujo actual
 
 1. El usuario entra a `/fixture`.
-2. Elige el módulo que necesita operar.
-3. La página actúa como menú contextual más que como vista de datos.
+2. Identifica el área que necesita operar.
+3. Navega al módulo correcto.
 
-## APIs y acciones disponibles
+## Relaciones reales
 
-- No expone endpoints propios.
-- Orquesta navegación hacia endpoints de:
-  - `/api/tournaments`
-  - `/api/tournaments/:id`
-  - `/api/matches/:id`
-- No ejecuta server actions.
+- `tournaments`
+  - es el destino principal cuando se quiere operar un fixture real.
+- `tournaments/[id]`
+  - contiene fixture, calendario, resultados y exportaciones.
+- `establishments`, `teams`, `disciplines`
+  - alimentan la preparación previa al torneo.
 
 ## Hallazgos
 
-- El nombre “Fixture General” sugiere una vista agregada, pero hoy funciona principalmente como landing page de navegación.
-- Si más adelante se quiere una vista global real de partidos y estados, este módulo es el lugar natural para implementarla.
+- El nombre puede inducir a pensar que aquí hay un tablero global de partidos, pero no existe todavía.
+- Si se quiere una vista transversal de todos los partidos del sistema, este módulo es el candidato natural.
+
+## Cosas que evitar
+
+- No empezar a duplicar aquí lógica que ya vive en `/tournaments/[id]`.
+- No convertir esta pantalla en otro dashboard parcial sin una decisión explícita.
+- No agregar llamadas de datos pesadas si su función sigue siendo navegación.
+
+## Ver también
+
+- `src/app/contex.md`
+- `src/app/tournaments/contex.md`
+- `src/app/tournaments/[id]/contex.md`

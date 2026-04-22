@@ -1,4 +1,4 @@
-# Contexto del módulo de configuración
+# Contexto del módulo de settings
 
 ## Ruta
 
@@ -6,29 +6,40 @@
 
 ## Propósito
 
-Presenta información general de la aplicación.
+Hoy este módulo funciona como superficie informativa, no como panel de configuración operativa.
 
-Actualmente cumple un rol informativo, no de configuración editable.
+Su valor es contextual:
 
-## Archivos clave
+- explicar qué stack usa la app;
+- dejar visible el tipo de motor y base de datos;
+- servir como futuro punto de entrada para configuración real.
+
+## Archivo clave
 
 - `page.tsx`
-  - muestra versión;
-  - tipo de base de datos;
-  - tipo de motor de fixtures.
+  - muestra metadatos de la aplicación;
+  - no llama a servicios de negocio;
+  - no guarda preferencias.
 
-## Estado actual
+## Relaciones con otros módulos
 
-La pantalla no guarda preferencias ni expone formularios.
-
-Es, en la práctica, una vista “Acerca de”.
-
-## APIs y acciones disponibles
-
-- No expone endpoints propios.
-- Puede mostrar configuración derivada del entorno o de la documentación operativa, pero no administra datos de negocio.
+- `src/app/contex.md`
+  - lo clasifica como módulo satélite.
+- `DOCUMENTATION.md`
+  - contiene el detalle técnico que esta pantalla podría resumir.
 
 ## Hallazgos
 
-- El título del módulo sugiere settings reales, pero hoy no hay configuración persistente.
-- Si se agregan opciones futuras como respaldo, restauración, idioma, reseteo de base o rutas de exportación, este módulo es el punto natural para alojarlas.
+- El nombre del módulo promete más de lo que hoy entrega.
+- Aun así, es el lugar correcto si en el futuro se agregan toggles de sincronización, exportación, idioma o mantenimiento.
+
+## Cosas que evitar
+
+- No meter aquí reglas de negocio de torneos o fixture.
+- No presentar como editable algo que todavía no se persiste.
+- No duplicar documentación técnica extensa dentro de la UI.
+
+## Ver también
+
+- `src/app/contex.md`
+- `DOCUMENTATION.md`

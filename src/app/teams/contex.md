@@ -6,63 +6,78 @@
 
 ## Propósito
 
-Administra los equipos disponibles para torneos.
+Este módulo administra el inventario de equipos inscribibles en torneos.
 
-En el estado actual del sistema, cada establecimiento genera automáticamente un equipo base homónimo.
-El módulo también permite crear equipos adicionales manualmente.
+Su particularidad es que no parte de cero: convive con una política automática donde cada establecimiento puede originar un equipo base homónimo.
 
-## Archivos clave
+## Responsabilidades
+
+- listar equipos con su establecimiento;
+- crear equipos manuales adicionales;
+- eliminar equipos no requeridos;
+- exponer el conjunto disponible para `tournaments`.
+
+## Archivos y llamadas relevantes
 
 - `page.tsx`
-  - Lista equipos con su establecimiento asociado.
-  - Obtiene establecimientos para el formulario de alta.
+  - consulta equipos y establecimientos disponibles.
 
 - `Components.tsx`
-  - `NewTeamForm`
-  - `DeleteTeamButton`
+  - alta y baja de equipos.
 
 - `../actions/teams.ts`
-  - Alta y eliminación.
+  - llama a `src/features/teams/application/team-service.ts`.
 
-## Flujos de trabajo
+- `src/features/teams/application/team-service.ts`
+  - listado, detalle, alta, edición y baja.
 
-### Equipo automático por establecimiento
+- `src/lib/establishments.ts`
+  - sincroniza equipos base desde establecimientos.
+
+## Flujos principales
+
+### Equipo base por establecimiento
 
 1. Se crea o sincroniza un establecimiento.
-2. `ensureTeamsMatchEstablishments()` revisa si existe un equipo con el mismo nombre para ese establecimiento.
+2. La rutina de sincronización revisa si ya existe el equipo base.
 3. Si no existe, lo crea.
 
 ### Alta manual de equipo
 
-1. El usuario abre el formulario.
-2. Indica nombre del equipo y establecimiento.
-3. Se crea el registro y se revalidan `/teams` y `/establishments`.
+1. El usuario envía nombre y establecimiento.
+2. La action delega al servicio.
+3. El servicio inserta el equipo.
+4. Se revalidan vistas que lo consumen.
 
-## APIs y acciones disponibles
+### Consumo desde torneos
 
-API HTTP:
+1. `/tournaments` y `/tournaments/[id]` cargan el directorio de equipos.
+2. La UI filtra los ya inscritos para no duplicarlos.
+3. `addTeamToTournament()` usa el `teamId` elegido.
 
-- `GET /api/teams`
-- `POST /api/teams`
-- `GET /api/teams/:id`
-- `PATCH /api/teams/:id`
-- `DELETE /api/teams/:id`
-
-Acciones server heredadas:
-
-- `createTeam(formData)`
-- `deleteTeam(id)`
-
-## Dependencias
+## Relaciones con otros módulos
 
 - `establishments`
-  - define el origen institucional de cada equipo.
+  - define la procedencia institucional y puede crear equipos base.
 - `tournaments`
-  - consume equipos para inscripción.
+  - consume este módulo para inscripción.
+- `tournaments/[id]`
+  - es el punto donde estos equipos se convierten en participantes reales del torneo.
 
 ## Hallazgos
 
-- El módulo dejó de ser un CRUD independiente: ahora refleja una política de sincronización con establecimientos.
-- No hay deduplicación fuerte para equipos manuales fuera del vínculo por establecimiento, por lo que el usuario todavía puede crear variantes adicionales si quiere.
-- Si más adelante se requiere separar “equipo base” de “equipo adicional”, conviene agregar un campo booleano o tipo.
-- Para frontend externo o integraciones, la vía recomendada ahora es la API HTTP y no consultas directas desde el módulo.
+- El módulo ya no es un CRUD puro; expresa una política de sincronización derivada de establecimientos.
+- La separación entre equipo base y equipo adicional todavía es conceptual, no estructural.
+- Este módulo afecta directamente la experiencia del selector de inscripción en torneos.
+
+## Cosas que evitar
+
+- No romper la relación `team -> establishment` con formularios parciales.
+- No suponer que todos los equipos son manuales.
+- No agregar lógica de inscripción aquí; eso pertenece a `tournaments/[id]`.
+
+## Ver también
+
+- `src/app/establishments/contex.md`
+- `src/app/tournaments/contex.md`
+- `src/app/tournaments/[id]/contex.md`

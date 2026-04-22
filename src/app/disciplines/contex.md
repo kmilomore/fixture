@@ -6,94 +6,92 @@
 
 ## Propósito
 
-Este módulo define los catálogos deportivos con los que se crean torneos.
+Este módulo mantiene los catálogos deportivos que habilitan todo el flujo posterior.
 
-Administra dos entidades:
+Sin disciplinas y categorías válidas:
+
+- no se pueden crear torneos correctamente;
+- el formulario de torneos queda bloqueado;
+- la sincronización de arranque pierde parte de su valor operativo.
+
+## Qué administra
 
 - disciplinas deportivas;
-- categorías competitivas.
+- categorías competitivas;
+- deduplicación lógica por normalización;
+- catálogo mínimo de arranque.
 
-## Datos base disponibles
-
-La aplicación sincroniza automáticamente un catálogo mínimo al iniciar:
-
-- disciplinas: `Fútbol`, `Básquetbol`, `Vóleibol`, `Balonmano`;
-- categorías: `Sub-14`, `Sub-17`, `Sub-18` con género `Mixto`.
-
-Además, el usuario puede seguir agregando más disciplinas y categorías manualmente.
-
-## Archivos clave
+## Archivos y llamadas relevantes
 
 - `page.tsx`
-  - Consulta disciplinas y categorías desde endpoints internos.
-  - Renderiza dos paneles independientes.
+  - pinta dos superficies: disciplinas y categorías.
+  - consume datos ya resueltos por la capa de aplicación.
 
 - `Forms.tsx`
-  - `AddDisciplineForm`
-  - `AddCategoryForm`
+  - alta de disciplina;
+  - alta de categoría.
 
 - `DeleteButtons.tsx`
-  - Elimina disciplinas y categorías.
+  - eliminación controlada.
 
 - `../actions/disciplines.ts`
-  - Acciones de alta y baja.
-  - Deduplicación lógica por nombre normalizado.
-  - Revalida `/disciplines` y `/tournaments`.
+  - llama a `src/features/disciplines/application/catalog-service.ts`.
+  - revalida `/disciplines` y `/tournaments`.
 
-- `../../lib/catalogs.ts`
-  - Mantiene la sincronización del catálogo base.
+- `src/features/disciplines/application/catalog-service.ts`
+  - listado, alta, edición y baja.
 
-## Flujos de trabajo
+- `src/features/disciplines/domain/catalog-normalization.ts`
+  - normalización y deduplicación semántica.
 
-### Carga automática del catálogo base
+- `src/lib/catalogs.ts`
+  - sincronización del catálogo base durante el arranque.
 
-1. Al iniciar la app, el layout llama `ensureDefaultCatalogsLoaded()`.
+## Flujos principales
+
+### Sincronización automática del catálogo base
+
+1. `layout.tsx` ejecuta la carga base al arrancar.
 2. Se consultan disciplinas y categorías existentes.
-3. Se insertan solo las faltantes.
-4. Nunca se eliminan registros creados por el usuario.
+3. Se insertan solo faltantes.
+4. Lo creado por usuario no se elimina.
 
 ### Alta manual de disciplina
 
-1. El usuario escribe el nombre.
-2. La server action valida que no exista una variante normalizada equivalente.
-3. Se crea la disciplina.
-4. Se revalida la vista de disciplinas y la de torneos.
+1. La UI envía nombre.
+2. La server action deriva al servicio.
+3. El servicio normaliza y deduplica.
+4. Si pasa validación, inserta.
+5. Se revalida la lista y el formulario de torneos.
 
 ### Alta manual de categoría
 
-1. El usuario indica `name` y `gender`.
-2. La acción valida el par `nombre + género` como clave lógica.
-3. Inserta si no existe.
+1. La UI envía `name` y `gender`.
+2. El servicio trata `nombre + género` como clave lógica.
+3. Inserta solo si no existe un equivalente normalizado.
 
-## APIs y acciones disponibles
-
-API HTTP:
-
-- `GET /api/disciplines`
-- `POST /api/disciplines`
-- `GET /api/disciplines/:id`
-- `PATCH /api/disciplines/:id`
-- `DELETE /api/disciplines/:id`
-- `GET /api/categories`
-- `POST /api/categories`
-- `GET /api/categories/:id`
-- `PATCH /api/categories/:id`
-- `DELETE /api/categories/:id`
-
-Acciones server heredadas:
-
-- `createDiscipline(formData)`
-- `deleteDiscipline(id)`
-- `createCategory(formData)`
-- `deleteCategory(id)`
-
-## Dependencias
+## Relaciones con otros módulos
 
 - `tournaments`
-  - usa estos catálogos para crear torneos.
+  - depende directamente de estos catálogos para crear torneos.
+- `src/app/contex.md`
+  - explica por qué este módulo es un maestro y no solo un CRUD.
 
 ## Hallazgos
 
-- Este módulo depende de sincronización automática, no de un seed manual.
-- La decisión actual es conservar siempre el catálogo base y permitir extensiones locales.
-- Si se eliminan registros base manualmente, la sincronización global volverá a reponerlos si faltan.
+- Este módulo condiciona el resto del sistema aunque su UI sea pequeña.
+- La sincronización de arranque es parte del contrato funcional, no solo una conveniencia.
+- La normalización de nombres evita una gran parte de la basura de catálogo sin necesidad de reglas complejas en UI.
+
+## Cosas que evitar
+
+- No validar duplicados solo por texto literal.
+- No mover la normalización a formularios cliente.
+- No permitir que el formulario de torneos dependa de datos crudos sin saneamiento.
+- No romper la revalidación de `/tournaments`, porque este módulo impacta su formulario.
+
+## Ver también
+
+- `src/app/contex.md`
+- `src/app/tournaments/contex.md`
+- `DOCUMENTATION.md`

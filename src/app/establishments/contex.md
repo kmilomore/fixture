@@ -1,345 +1,110 @@
-# Establecimientos: contexto del módulo
+# Contexto del módulo de establecimientos
 
-## Objetivo
+## Ruta
 
-Este módulo administra el directorio de establecimientos de la aplicación.
+- `/establishments`
 
-Actualmente cumple cuatro funciones principales:
+## Propósito
 
-1. Mantener un directorio base de escuelas y establecimientos disponible dentro de la app.
-2. Permitir agregar nuevos establecimientos locales desde la interfaz.
-3. Permitir importación y exportación CSV del padrón actual.
-4. Sincronizar automáticamente un equipo base por cada establecimiento para que quede disponible en torneos.
+Este es el registro maestro institucional del sistema.
 
-## Alcance funcional
+No solo guarda establecimientos: también condiciona la disponibilidad de equipos base y, por extensión, la capacidad de preparar torneos.
 
-El módulo representa el registro maestro de instituciones.
+## Responsabilidades actuales
 
-Cada establecimiento puede:
+- mantener un directorio base integrado en la app;
+- permitir altas manuales;
+- importar y exportar CSV;
+- deduplicar por nombre normalizado;
+- sincronizar equipos base homónimos.
 
-- existir como registro base cargado desde el CSV integrado en la aplicación;
-- existir como registro creado manualmente por el usuario;
-- recibir equipos asociados;
-- generar automáticamente un equipo homónimo si no existe.
-
-## Archivos principales del módulo
-
-### UI y página
+## Archivos y llamadas relevantes
 
 - `page.tsx`
-  - Página server component del módulo.
-  - Renderiza la vista principal del directorio.
-  - La capa API del módulo vive en `../api/establishments/**`.
+  - carga la vista principal del directorio.
 
 - `EstablishmentsTable.tsx`
-  - Componente client.
-  - Muestra la información en formato tabla.
-  - Implementa buscador por nombre.
-  - Implementa filtro por comuna.
-  - Expone acción de eliminación por fila.
+  - tabla con búsqueda, filtro por comuna y acciones por fila.
 
 - `NewEstablishmentForm.tsx`
-  - Formulario client para alta manual.
-  - Envía `name` y `comuna` a la server action.
+  - alta manual.
 
 - `CsvImporter.tsx`
-  - Modal client para carga masiva por CSV.
-  - Detecta columnas flexibles de nombre.
-  - Detecta comuna si existe.
-  - Previsualiza registros antes de importar.
-
-- `DeleteEstablishmentButton.tsx`
-  - Botón client para borrar un establecimiento.
+  - previsualización y carga masiva.
 
 - `ExportEstablishmentsButton.tsx`
-  - Dispara la descarga del CSV actual desde una ruta API.
-
-### Lógica de negocio y datos
+  - dispara `GET /api/establishments/export`.
 
 - `../actions/establishments.ts`
-  - Alta manual.
-  - Eliminación.
-  - Revalidación de vistas relacionadas.
+  - llama a `src/features/establishments/application/establishment-service.ts`.
+  - también concentra `bulkCreateEstablishments()`.
 
-- `../actions/fixture.ts`
-  - Contiene la carga masiva de establecimientos desde CSV.
+- `src/features/establishments/application/establishment-service.ts`
+  - CRUD y carga masiva.
 
-- `../../lib/establishments.ts`
-  - Normalización de nombres.
-  - Normalización de comuna.
-  - Deduplicación.
-  - Carga del CSV base.
-  - Sincronización del directorio por defecto.
-  - Sincronización automática de equipos homónimos.
+- `src/features/establishments/domain/establishment-normalization.ts`
+  - normalización y deduplicación.
 
-- `../api/establishments/export/route.ts`
-  - Exportación CSV del padrón vigente.
+- `src/lib/establishments.ts`
+  - sincronización del CSV base y de equipos base durante arranque.
 
-- `../api/establishments/route.ts`
-  - `GET` listado con filtros `q` y `comuna`.
-  - `POST` alta de establecimiento.
+## Flujos principales
 
-- `../api/establishments/[id]/route.ts`
-  - `GET` detalle de establecimiento.
-  - `PATCH` edición.
-  - `DELETE` baja.
+### Sincronización del directorio base
 
-### Configuración y datos fuente
+1. El layout ejecuta la rutina base.
+2. Se lee `public/formacion_directorio_territorio.csv`.
+3. Se normalizan nombre y comuna.
+4. Se insertan faltantes.
+5. Se actualizan comunas vacías si el CSV trae valor.
+6. Se sincronizan equipos base.
 
-- `../../../public/formacion_directorio_territorio.csv`
-  - Fuente base del directorio por defecto.
-  - Se usa como catálogo integrado en la app.
+### Alta manual
 
-- Esquema PostgreSQL del proyecto
-  - Define la estructura esperada para `Establishment`.
-  - Actualmente se espera el campo `comuna` además de `name` y `logoUrl`.
+1. El usuario envía nombre y comuna.
+2. La action llama al servicio.
+3. El servicio valida duplicado lógico.
+4. Inserta el establecimiento.
+5. Se sincroniza equipo base y se revalidan vistas dependientes.
 
-## Modelo conceptual actual
+### Importación CSV manual
 
-### Establecimiento
+1. El cliente detecta columnas alias para nombre y comuna.
+2. Se arma una vista previa.
+3. La action ejecuta `bulkCreateEstablishments()`.
+4. El servicio inserta solo faltantes.
+5. Se sincronizan equipos base de los nuevos registros.
 
-Campos esperados a nivel funcional:
+### Exportación CSV
 
-- `id`
-- `name`
-- `comuna`
-- `logoUrl`
-- `createdAt`
-- `updatedAt`
+1. La UI llama a `GET /api/establishments/export`.
+2. La route usa el mismo origen de datos actual del módulo.
+3. Exporta padrón con comuna, cantidad de equipos y timestamps.
 
-### Relación con equipos
+## Relaciones con otros módulos
 
-La aplicación trabaja ahora con la regla operativa:
+- `teams`
+  - depende de este módulo para el origen institucional.
+- `tournaments`
+  - se beneficia de tener equipos listos derivados del padrón.
+- `src/app/contex.md`
+  - explica por qué este módulo afecta el arranque global.
 
-- cada escuela o establecimiento debe existir también como equipo base.
+## Hallazgos
 
-Esto permite que el directorio de establecimientos no sea solo informativo, sino que sirva inmediatamente para alimentar torneos sin cargar manualmente un equipo por cada escuela.
+- Este módulo ya no es un CRUD aislado; es una bisagra entre catálogo base, datos locales y equipos.
+- La idempotencia de la sincronización es obligatoria, no opcional.
+- El campo `comuna` ya forma parte del contrato funcional y debe mantenerse alineado en esquema, API y UI.
 
-## Flujo de trabajo principal
+## Cosas que evitar
 
-### 1. Disponibilidad del directorio base al iniciar la app
+- No deduplicar por texto literal.
+- No romper la sincronización con equipos base al mover lógica de importación.
+- No tratar la eliminación como una baja inocua; puede afectar equipos y torneos.
+- No separar el CSV base del contrato del módulo sin reemplazar esa fuente de verdad.
 
-Flujo actual:
+## Ver también
 
-1. El layout principal llama a la rutina de sincronización del directorio base.
-2. La rutina lee el CSV integrado en `public`.
-3. Se normalizan nombres y comunas.
-4. Se comparan contra la base local.
-5. Si faltan establecimientos del catálogo base, se crean.
-6. Si un establecimiento ya existe pero no tiene comuna y el CSV sí la trae, se actualiza.
-7. Luego se sincronizan los equipos base homónimos.
-
-Resultado esperado:
-
-- el directorio base debe quedar siempre disponible en la aplicación, incluso si la base local no lo tiene completo;
-- el usuario puede seguir agregando más establecimientos sin perder el catálogo base.
-
-### 2. Alta manual de establecimiento
-
-Flujo actual:
-
-1. El usuario abre el formulario de nuevo establecimiento.
-2. Ingresa nombre y comuna.
-3. La server action valida que el nombre exista y no sea duplicado lógico.
-4. Se crea el establecimiento.
-5. Se ejecuta la sincronización de equipos base.
-6. Se revalidan `/establishments`, `/teams` y `/`.
-
-Resultado esperado:
-
-- cada nuevo establecimiento manual también debería aparecer como equipo base automáticamente.
-
-### 3. Importación CSV manual
-
-Flujo actual:
-
-1. El usuario selecciona un archivo CSV.
-2. El cliente detecta columna de nombre usando alias flexibles.
-3. Si existe columna `comuna`, también se toma.
-4. Se construye una vista previa.
-5. La server action deduplica registros por nombre normalizado.
-6. Se insertan solo los faltantes.
-7. Se sincronizan equipos base para los nuevos establecimientos.
-8. Se revalidan vistas.
-
-Columnas admitidas para nombre:
-
-- `nombre`
-- `name`
-- `establecimiento`
-- `colegio`
-- `institución`
-- `institucion`
-
-Columnas admitidas para comuna:
-
-- `comuna`
-- `municipio`
-- `ciudad`
-
-### 4. Exportación CSV
-
-Flujo actual:
-
-1. El usuario presiona exportar.
-2. La ruta API consulta establecimientos y conteo de equipos.
-3. Se genera un CSV con el estado actual de la base.
-
-Columnas exportadas:
-
-- `id`
-- `nombre`
-- `comuna`
-- `equipos`
-- `creado_en`
-- `actualizado_en`
-
-### 5. Visualización y consulta
-
-La pantalla actual del módulo usa una tabla con:
-
-- buscador por nombre de escuela o establecimiento;
-- filtro por comuna;
-- columna de cantidad de equipos;
-- columna de fecha de creación;
-- acción de eliminación por fila.
-
-## Regla de deduplicación
-
-La deduplicación actual no compara texto literal, sino nombre normalizado.
-
-Normalización aplicada:
-
-- quita tildes;
-- convierte a minúsculas;
-- reemplaza caracteres no alfanuméricos por espacios;
-- colapsa espacios múltiples.
-
-Ejemplos que se consideran equivalentes:
-
-- `Colegio San José`
-- `COLEGIO SAN JOSE`
-- `Colegio-San José`
-
-## Decisiones de diseño actuales
-
-### Directorio base persistente
-
-Se decidió que el CSV integrado no sea solo una carga inicial única, sino una fuente de sincronización.
-
-## Endpoints del módulo
-
-- `GET /api/establishments`
-- `POST /api/establishments`
-- `GET /api/establishments/:id`
-- `PATCH /api/establishments/:id`
-- `DELETE /api/establishments/:id`
-- `GET /api/establishments/export`
-
-Esto significa:
-
-- si faltan establecimientos base, la app debe reponerlos;
-- si el usuario agregó establecimientos nuevos, esos se conservan;
-- el catálogo base y los datos locales conviven en la misma tabla.
-
-### Equipos automáticos por establecimiento
-
-Se decidió que las escuelas sean también equipos base.
-
-Esto reduce fricción operativa porque:
-
-- evita crear manualmente un equipo por cada escuela;
-- deja el módulo de torneos listo para operar apenas existe el directorio;
-- mantiene consistencia entre establecimiento y equipo principal.
-
-## Hallazgos técnicos
-
-### Hallazgo 1: el módulo ya no es solo un CRUD
-
-El módulo se transformó en un punto de sincronización entre tres fuentes:
-
-- CSV base integrado;
-- base local SQLite;
-- módulo de equipos.
-
-Por eso cualquier cambio aquí impacta directamente la disponibilidad de equipos y la preparación de torneos.
-
-### Hallazgo 2: `comuna` requiere consistencia real entre API y base
-
-Se incorporó el campo `comuna` en el esquema funcional, pero apareció un desfase típico:
-
-- la UI y la lógica ya intentan usar `establishment.comuna`;
-- si la API o la base no están alineadas, el frontend queda fuera de sincronía con los datos reales.
-
-Consecuencia práctica:
-
-- hay que mantener la API y el esquema de PostgreSQL alineados antes de considerar estable este cambio.
-
-### Hallazgo 3: la sincronización automática debe ser idempotente
-
-La rutina de carga base debe poder ejecutarse muchas veces sin duplicar datos.
-
-Eso obliga a:
-
-- deduplicar por nombre normalizado;
-- insertar solo faltantes;
-- actualizar solo atributos vacíos o incompletos cuando corresponda.
-
-### Hallazgo 4: borrar establecimientos puede tener efecto en cascada operativo
-
-Eliminar un establecimiento puede impactar:
-
-- equipos asociados;
-- selección de equipos para torneos;
-- consistencia del directorio base si luego la sincronización vuelve a reponerlo.
-
-Esto debe tratarse como una decisión funcional, no solo técnica.
-
-## Riesgos y pendientes
-
-### Pendiente crítico
-
-Mantener alineados el esquema de PostgreSQL y los endpoints que exponen `comuna`.
-
-Pendientes esperables:
-
-1. aplicar ajuste de esquema si el hosting no refleja la columna esperada;
-2. validar endpoints de establecimientos y exportación;
-3. volver a ejecutar build.
-
-### Pendiente funcional
-
-Definir política de eliminación del catálogo base.
-
-Preguntas abiertas:
-
-- si un establecimiento base se elimina manualmente, ¿la sincronización debe reponerlo?
-- o ¿debería existir una marca que diferencie catálogo base de registros locales?
-
-Hoy, por la dirección actual del módulo, la expectativa funcional es que el directorio base esté siempre disponible.
-
-### Pendiente de UX
-
-La tabla aún puede crecer en capacidades:
-
-- paginación;
-- orden por columnas;
-- indicador visual de si el registro viene del catálogo base o fue creado localmente.
-
-## Dependencias cruzadas
-
-El módulo de establecimientos afecta directamente:
-
-- `teams`: porque sincroniza equipos base homónimos.
-- `tournaments`: porque depende de que existan equipos para inscribir.
-- `dashboard`: porque revalida conteos al crear o borrar.
-
-## Estado esperado del módulo después de estabilizar la capa de datos
-
-Cuando el ajuste de la API y la base esté completo, el comportamiento objetivo de la carpeta debe ser:
-
-1. el directorio base siempre está disponible en la app;
-2. el usuario puede agregar más establecimientos locales;
-3. cada establecimiento tiene su equipo base automático;
-4. la vista principal es tabular, con buscador y filtro por comuna;
-5. la exportación CSV refleja el estado real de la base local.
+- `src/app/contex.md`
+- `src/app/teams/contex.md`
+- `src/app/tournaments/contex.md`

@@ -6,236 +6,135 @@
 
 ## Propósito
 
-Concentra la operación completa de un torneo individual desde una sola vista de trabajo.
+Este es el centro operativo del sistema.
 
-El submódulo ya no se limita a crear el fixture. También administra:
+Aquí convergen:
 
-- ciclo de vida del torneo;
-- persistencia de reglas de calendarización;
-- inscripción y cierre de participantes;
-- operación diaria de partidos;
-- incidencias deportivas y administrativas;
-- exportación operativa del fixture.
+- inscripción final de participantes;
+- definición de formato y seeds;
+- generación del fixture;
+- tabla de posiciones;
+- progresión automática de cruces;
+- carga de resultados e incidencias;
+- vista calendario;
+- exportación PDF y Excel.
 
-## Pestañas actuales
+## Pestañas y su rol real
 
 - `Resumen`
-  - muestra métricas rápidas del torneo;
-  - muestra el siguiente paso operativo sugerido;
-  - expone control manual del estado del torneo con transiciones válidas.
-
+  - síntesis del torneo y control de estado.
 - `Equipos`
-  - permite inscribir o quitar equipos solo mientras no exista fixture generado.
-
+  - inscripción solo antes del fixture.
 - `Fixture`
-  - permite elegir formato y reglas calendario antes de generar;
-  - muestra la estructura deportiva agrupada por grupo, fecha interna o ronda;
-  - permite editar estado, marcador, fecha, lugar e incidencias de cada partido.
-
+  - lógica deportiva: grupos, rondas, standings, cruces y edición de partidos.
 - `Calendario`
-  - reordena los partidos por día real de juego;
-  - permite filtrar por estado, sede y día;
-  - sirve como tablero operativo separado del agrupamiento deportivo.
+  - lógica operativa: día real, hora, lugar y filtros.
 
-## Archivos clave
+## Archivos y llamadas relevantes
 
 - `page.tsx`
-  - consulta torneo, equipos y partidos;
-  - serializa datos para componentes cliente;
-  - resuelve pestañas y badges del estado del torneo.
+  - llama a `getTournamentDetail()` y serializa el agregado.
 
 - `ClientComponents.tsx`
-  - contiene gestión de equipos;
-  - contiene control manual de estado del torneo.
+  - maneja inscripción de equipos y control de estado del torneo.
 
 - `FixtureEngine.tsx`
-  - configura formato y reglas de calendario;
-  - genera el fixture;
-  - renderiza los partidos agrupados en lógica deportiva;
-  - permite edición inline de estado, marcador, lugar, fecha e incidencias;
-  - expone exportaciones y reinicio del fixture.
+  - controla formato, grupos, seeds, calendario y generación.
 
 - `CalendarView.tsx`
-  - construye una vista operativa por fecha real;
-  - filtra por `status`, `location` y `day`.
+  - ordena los partidos por fecha real y separa nombre del equipo y establecimiento.
 
-- `../../../api/tournaments/[id]/route.ts`
-  - devuelve el agregado completo del torneo;
-  - deriva el estado visible del torneo;
-  - persiste reglas de calendario.
+- `src/features/fixture/presentation/*`
+  - presentación deportiva del fixture.
 
-- `../../../api/tournaments/[id]/fixture/format/route.ts`
-  - guarda el formato y la configuración calendario del torneo.
+- `src/features/fixture/domain/fixture-engine.ts`
+  - genera partidos por formato.
 
-- `../../../api/tournaments/[id]/fixture/generate/route.ts`
-  - genera los partidos y deja el torneo en estado `SCHEDULED`.
+- `src/features/fixture/domain/standings.ts`
+  - calcula puntos, puestos y clasificados.
 
-- `../../../api/tournaments/[id]/fixture/reset/route.ts`
-  - elimina partidos y vuelve el torneo a `DRAFT`.
+- `src/features/fixture/domain/progression.ts`
+  - resuelve clasificados y arrastra ganadores hacia cruces siguientes.
 
-- `../../../api/tournaments/[id]/teams/route.ts`
-  - permite inscribir equipos solo antes del fixture.
+- `src/features/fixture/application/fixture-service.ts`
+  - persiste formato, generación, reset y actualización de partidos.
 
-- `../../../api/tournaments/[id]/teams/[teamEntryId]/route.ts`
-  - permite quitar equipos solo antes del fixture.
+- `src/lib/tournamentExports.ts`
+  - toma el agregado del torneo y lo transforma en estructura exportable común para PDF y Excel.
 
-- `../../../api/matches/[id]/route.ts`
-  - actualiza estado del partido, marcador, lugar, fecha, incidencia y notas;
-  - recalcula el estado agregado del torneo a partir de los partidos.
+## Flujos principales
 
-- `../../../lib/tournamentLifecycle.ts`
-  - define estados del torneo, transiciones permitidas y presentación visible.
+### Antes de generar
 
-- `../../../lib/matchLifecycle.ts`
-  - define estados del partido, tipos de incidencia y su presentación.
+1. El torneo llega desde `/tournaments`.
+2. Se inscriben equipos.
+3. Se elige formato.
+4. Si hay grupos, se define cantidad de grupos.
+5. Si se desea, se seleccionan cabezas de serie por grupo.
+6. Se configuran reglas de calendarización.
+7. Se genera el fixture.
 
-- `../../../lib/tournamentExports.ts`
-  - centraliza los datos exportables del torneo;
-  - evita duplicar lógica entre PDF y Excel.
+### Fase grupal
 
-## Estados del torneo
+1. Los partidos de grupo alimentan `standings`.
+2. La tabla muestra puntos, diferencia y puesto.
+3. Se marcan clasificados según regla actual.
+4. En `GRUPOS_ELIMINATORIA` con 3 grupos clasifican los tres primeros y el mejor segundo.
 
-- `DRAFT`
-  - torneo sin condiciones mínimas para generar fixture.
+### Fase eliminatoria
 
-- `READY`
-  - ya tiene formato y al menos dos equipos;
-  - todavía no tiene partidos generados.
+1. `progression` interpreta placeholders como `1A`, `2B`, `Mejor 2°` o `Ganador Semifinal 1`.
+2. Cuando un grupo queda resuelto o una llave tiene ganador, se recalculan asignaciones automáticas.
+3. Los cruces futuros se completan sin intervención manual si todavía no están cerrados.
 
-- `SCHEDULED`
-  - el fixture existe y no hay partidos cerrados todavía.
+### Carga de resultados
 
-- `PLAYING`
-  - existe fixture y al menos un partido ya quedó cerrado.
+1. `MatchRow` envía estado, marcador, fecha, lugar e incidencias.
+2. `fixture-service` valida el estado del partido.
+3. Solo `FINISHED` y `WALKOVER` aceptan marcador.
+4. Si hay incidencia, la nota es obligatoria.
+5. Luego se recalcula progresión automática y estado agregado del torneo.
 
-- `PAUSED`
-  - estado manual para detener la operación sin borrar el fixture.
+### Vista calendario
 
-- `FINISHED`
-  - todos los partidos del torneo están cerrados.
-
-- `CANCELLED`
-  - estado manual de cancelación del torneo.
-
-## Transiciones válidas del torneo
-
-- `DRAFT -> READY | CANCELLED`
-- `READY -> DRAFT | SCHEDULED | CANCELLED`
-- `SCHEDULED -> READY | PLAYING | PAUSED | CANCELLED`
-- `PLAYING -> PAUSED | FINISHED | CANCELLED`
-- `PAUSED -> SCHEDULED | PLAYING | CANCELLED`
-- `FINISHED -> SCHEDULED`
-- `CANCELLED -> DRAFT`
-
-## Estados del partido
-
-- `SCHEDULED`
-  - partido programado, sin marcador.
-
-- `LIVE`
-  - partido en juego, sin cierre definitivo.
-
-- `FINISHED`
-  - partido finalizado con marcador obligatorio.
-
-- `WALKOVER`
-  - partido resuelto administrativamente con marcador obligatorio.
-
-- `SUSPENDED`
-  - partido suspendido, sin marcador válido.
-
-- `CANCELLED`
-  - partido cancelado, sin marcador válido.
-
-## Tipos de incidencia del partido
-
-- `NO_PRESENTACION`
-- `SUSPENSION`
-- `PROTESTA`
-- `ABANDONO`
-- `REPROGRAMACION`
-
-## Reglas de negocio vigentes
-
-### Equipos y fixture
-
-1. Un torneo necesita al menos dos equipos para poder quedar `READY` o generar fixture.
-2. No se pueden agregar ni quitar equipos una vez que existe al menos un partido generado.
-3. El reinicio del fixture borra partidos y devuelve el torneo a `DRAFT`.
-
-### Formato y calendarización
-
-1. La configuración calendario se persiste en el torneo.
-2. Si el calendario no tiene suficientes slots válidos, la generación falla con error explícito.
-3. `GRUPOS_ELIMINATORIA` permite `2`, `3` o potencias de `2` en cantidad de grupos.
-
-### Estados del partido
-
-1. El marcador solo puede guardarse cuando el partido está en `FINISHED` o `WALKOVER`.
-2. Si un partido no está en `FINISHED` o `WALKOVER`, el marcador se limpia y no se acepta en API.
-3. Una incidencia requiere siempre una nota descriptiva.
-4. No se pueden guardar notas de incidencia si no existe un tipo de incidencia.
-5. El estado visible del torneo depende del agregado de estados de sus partidos, no solo de un valor manual persistido.
-
-### Exportaciones
-
-1. PDF y Excel salen de una estructura común centralizada.
-2. Las exportaciones ya incluyen estado del partido e incidencias.
-3. PDF prioriza lectura e impresión.
-4. Excel prioriza administración y revisión posterior.
-
-## Flujos de trabajo
-
-### Antes del fixture
-
-1. El torneo entra en `DRAFT`.
-2. Se define formato.
-3. Se inscriben equipos.
-4. Si hay formato y al menos dos equipos, el torneo queda `READY`.
-5. Se definen reglas de calendarización.
-6. Se genera el fixture.
-7. El torneo pasa a `SCHEDULED`.
-
-### Operación del fixture
-
-1. La pestaña `Fixture` muestra el agrupamiento deportivo.
-2. Cada partido se puede editar inline.
-3. El usuario puede cambiar estado, lugar, fecha, incidencia y notas.
-4. Solo `FINISHED` y `WALKOVER` aceptan marcador.
-5. Cuando aparecen partidos cerrados, el torneo pasa a `PLAYING`.
-6. Cuando todos los partidos están cerrados, el torneo pasa a `FINISHED`.
-
-### Operación calendario
-
-1. La pestaña `Calendario` ordena partidos por fecha real.
-2. El usuario puede filtrar por estado del partido.
-3. El usuario puede filtrar por sede o lugar.
-4. El usuario puede filtrar por día específico o partidos sin fecha.
+1. `CalendarView` reordena partidos por fecha real.
+2. Permite filtrar por estado, lugar y día.
+3. Se usa para operación de sedes y reprogramaciones, no para leer la lógica deportiva.
 
 ### Exportación
 
-1. El torneo ya tiene partidos generados.
-2. El usuario exporta desde `Fixture`.
-3. PDF y Excel incluyen grupo o ronda, estado, incidencia, fecha, lugar y notas si existen.
+1. La UI dispara PDF o Excel.
+2. Ambas rutas consumen la misma estructura exportable.
+3. La exportación refleja el mismo agregado visible del torneo.
 
-## Qué debe hacer esta sección
+## Relaciones con otros módulos
 
-- Resolver la operación de un torneo sin salir de su detalle.
-- Mantener separada la lógica deportiva del orden operativo por calendario.
-- Exponer reglas de negocio claras para equipos, partidos y estados.
-- Mantener exportaciones consistentes con lo que ve el usuario.
-
-## Qué se debe evitar
-
-- No permitir edición de equipos una vez generado el fixture.
-- No aceptar marcador en estados que no representan cierre válido del partido.
-- No permitir incidencias sin trazabilidad mínima mediante nota.
-- No duplicar la lógica exportable entre formatos.
-- No mezclar el agrupamiento deportivo con el tablero operativo calendario.
+- `tournaments`
+  - es la puerta de entrada a este submódulo.
+- `teams`
+  - aporta los participantes inscribibles.
+- `disciplines`
+  - aporta el contexto deportivo del torneo.
+- `establishments`
+  - aporta la capa institucional visible en equipos y calendario.
 
 ## Hallazgos
 
-- El módulo dejó de ser solo un generador de fixture y ahora actúa como centro operativo del torneo.
-- La consistencia del sistema depende cada vez más de contratos compartidos como `tournamentLifecycle` y `matchLifecycle`.
-- El mayor riesgo funcional no está en la generación del fixture sino en la consistencia entre estado de partido, estado del torneo y exportaciones.
-- La pestaña `Calendario` es la superficie más cercana a una mesa de control real.
+- Este es el módulo más sensible del sistema porque mezcla estado, dominio deportivo y operación diaria.
+- La mayor fuente de errores no suele ser la generación inicial sino la progresión posterior al registrar resultados.
+- La separación entre `Fixture` y `Calendario` es correcta: uno responde a lógica deportiva y el otro a operación real.
+- PDF y Excel deben depender del mismo agregado del torneo o divergen muy rápido.
+
+## Cosas que evitar
+
+- No permitir edición de equipos después de generar partidos.
+- No aceptar marcador en estados no terminales.
+- No duplicar la lógica de clasificación en componentes cliente.
+- No resolver exportaciones con consultas alternativas a la del detalle.
+- No mezclar el orden deportivo con el orden calendario.
+
+## Ver también
+
+- `src/app/contex.md`
+- `src/app/tournaments/contex.md`
+- `DOCUMENTATION.md`
