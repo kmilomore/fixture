@@ -73,6 +73,7 @@ export function GeneratedFixtureView({
             <FileSpreadsheet className="w-4 h-4" /> Exportar Excel
           </a>
           <button
+            type="button"
             onClick={onReset}
             disabled={isPending}
             className="flex items-center gap-1 text-red-500 hover:text-red-700 text-sm font-medium bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"

@@ -121,6 +121,7 @@ export function MatchRow({ tournamentId, match, isEditing, onEdit, onCancelEdit 
 
         {!isBye && !isPlaceholderMatch && (
           <button
+            type="button"
             onClick={onEdit}
             className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-700"
             title="Editar resultado/fecha"
@@ -183,8 +184,8 @@ export function MatchRow({ tournamentId, match, isEditing, onEdit, onCancelEdit 
             </p>
           )}
           <div className="col-span-2 flex justify-end gap-2 mt-1">
-            <button onClick={onCancelEdit} className="text-sm px-3 py-1.5 bg-slate-200 hover:bg-slate-300 rounded-lg text-slate-600">Cancelar</button>
-            <button onClick={handleSave} disabled={isPending} className="text-sm px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium">
+            <button type="button" onClick={onCancelEdit} className="text-sm px-3 py-1.5 bg-slate-200 hover:bg-slate-300 rounded-lg text-slate-600">Cancelar</button>
+            <button type="button" onClick={handleSave} disabled={isPending} className="text-sm px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium">
               {isPending ? "Guardando..." : "Guardar"}
             </button>
           </div>

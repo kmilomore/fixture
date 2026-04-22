@@ -20,6 +20,7 @@ Tiene dos niveles:
 - listado y borrado;
 - enlace hacia el centro operativo del detalle;
 - preparación de un flujo deportivo con grupos, seeds y calendario real;
+- preparación de una operación diaria donde los cambios de estado del partido deben reflejarse inmediatamente;
 - compatibilidad con esquemas parcialmente migrados.
 
 ## Archivos y llamadas relevantes
@@ -59,7 +60,8 @@ Tiene dos niveles:
 2. Inscribe equipos antes de generar fixture.
 3. Configura formato, grupos, cabezas de serie y reglas calendario.
 4. Puede separar lectura por fase grupal, eliminatoria y calendario.
-5. Desde ahí entra al flujo deportivo de `/tournaments/[id]`.
+5. Cuando registra resultados, el detalle refresca el agregado para reflejar estado y progresión sin quedar con estado cliente viejo.
+6. Desde ahí entra al flujo deportivo de `/tournaments/[id]`.
 
 ### Compatibilidad de esquema
 
@@ -83,6 +85,7 @@ Tiene dos niveles:
 - La compatibilidad con esquema legado sigue siendo importante para no romper listados o detalles en despliegues intermedios.
 - La calidad del selector de inscripción impacta fuertemente la operación cuando el padrón crece.
 - El detalle del torneo ya no solo genera partidos: ahora también refleja clasificación grupal y progresión automática hacia llaves.
+- La operación real también depende de un calendario legible y de que la edición de partidos refresque la UI con el agregado persistido.
 
 ## Cosas que evitar
 

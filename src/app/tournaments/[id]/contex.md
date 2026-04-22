@@ -16,7 +16,7 @@ Aquí convergen:
 - vista explícita de fase grupal y tabla de posiciones;
 - progresión automática de cruces;
 - carga de resultados e incidencias;
-- vista calendario en cuadrícula;
+- vista calendario minimalista con detalle por evento;
 - exportación PDF y Excel.
 
 ## Pestañas y su rol real
@@ -28,7 +28,8 @@ Aquí convergen:
 - `Fixture`
   - lógica deportiva: grupos, standings, cruces, filtros por fase y edición de partidos.
 - `Calendario`
-  - lógica operativa: cuadrícula semanal por día real, hora, lugar y filtros.
+  - lógica operativa: agenda visual resumida por día real, hora, lugar y filtros.
+  - permite abrir el detalle de cada evento al hacer click.
 
 ## Archivos y llamadas relevantes
 
@@ -43,9 +44,15 @@ Aquí convergen:
   - expone la superficie que separa vista grupal, eliminatoria y total.
 
 - `CalendarView.tsx`
-  - pinta un tablero calendario en cuadrícula semanal.
+  - pinta una agenda visual minimalista agrupada por día.
   - separa partidos programados y partidos sin fecha.
-  - muestra nombre del equipo y establecimiento de forma desacoplada.
+  - abre un panel modal con detalle del evento al hacer click.
+  - evita formateos de fecha dependientes del entorno durante el render.
+
+- `src/features/fixture/presentation/MatchRow.tsx`
+  - resincroniza estado local desde el partido persistido.
+  - fuerza refresh de ruta luego de guardar para reflejar cambios de estado.
+  - evita formateo no determinista de fecha en render.
 
 - `src/features/fixture/presentation/*`
   - presentación deportiva del fixture.
@@ -99,15 +106,18 @@ Aquí convergen:
 2. `fixture-service` valida el estado del partido.
 3. Solo `FINISHED` y `WALKOVER` aceptan marcador.
 4. Si hay incidencia, la nota es obligatoria.
-5. Si el resultado afecta la clasificación grupal o define un ganador, se recalcula la progresión automática.
-6. Luego se recalcula el estado agregado del torneo.
+5. Luego de guardar, la vista fuerza refresh para evitar que el estado quede viejo en cliente.
+6. Si el resultado afecta la clasificación grupal o define un ganador, se recalcula la progresión automática.
+7. Luego se recalcula el estado agregado del torneo.
 
 ### Vista calendario
 
-1. `CalendarView` transforma los partidos con fecha en una cuadrícula semanal por días.
+1. `CalendarView` agrupa los partidos por día usando claves de fecha estables.
 2. Permite filtrar por estado, lugar y día.
-3. Los partidos sin fecha quedan fuera de la cuadrícula en un bloque separado.
-4. Se usa para operación de sedes y reprogramaciones, no para leer la lógica deportiva.
+3. Cada tarjeta resume fase, hora, participantes, estado y sede.
+4. Al hacer click se abre un detalle del evento con marcador, incidencias y notas.
+5. Los partidos sin fecha quedan fuera del bloque principal en una agrupación separada.
+6. Se usa para operación de sedes y reprogramaciones, no para leer la lógica deportiva.
 
 ### Exportación
 
@@ -131,6 +141,7 @@ Aquí convergen:
 - Este es el módulo más sensible del sistema porque mezcla estado, dominio deportivo y operación diaria.
 - La mayor fuente de errores no suele ser la generación inicial sino la progresión posterior al registrar resultados.
 - La separación entre `Fixture` y `Calendario` es correcta: uno responde a lógica deportiva y el otro a operación real.
+- En componentes cliente hidratados desde SSR, el formateo de fecha con locale o timezone implícitos puede romper la hidratación y disparar errores React difíciles de rastrear.
 - PDF y Excel deben depender del mismo agregado del torneo o divergen muy rápido.
 - La legibilidad operativa mejora cuando la fase grupal y la eliminatoria se pueden leer como superficies distintas.
 - La automatización de llaves depende de que el orden de cruces sea estable; no puede quedar atado a ids o inserciones accidentales.
@@ -142,6 +153,7 @@ Aquí convergen:
 - No duplicar la lógica de clasificación en componentes cliente.
 - No resolver exportaciones con consultas alternativas a la del detalle.
 - No mezclar el orden deportivo con el orden calendario.
+- No renderizar fechas con `toLocaleString()` o equivalentes si la salida puede diferir entre servidor y navegador.
 - No depender del orden incidental de creación de partidos para numerar semifinales, cuartos o finales.
 
 ## Ver también

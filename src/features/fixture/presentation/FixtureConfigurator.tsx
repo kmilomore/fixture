@@ -79,6 +79,7 @@ export function FixtureConfigurator({
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
         <button
+          type="button"
           onClick={() => onSelectFormat("LIGA")}
           className={`rounded-xl border-2 p-4 text-left transition-all ${
             selectedFormat === "LIGA" ? "border-emerald-500 bg-emerald-50" : "border-slate-200 hover:border-slate-400"
@@ -91,6 +92,7 @@ export function FixtureConfigurator({
         </button>
 
         <button
+          type="button"
           onClick={() => onSelectFormat("ELIMINATORIA")}
           className={`rounded-xl border-2 p-4 text-left transition-all ${
             selectedFormat === "ELIMINATORIA" ? "border-indigo-500 bg-indigo-50" : "border-slate-200 hover:border-slate-400"
@@ -103,6 +105,7 @@ export function FixtureConfigurator({
         </button>
 
         <button
+          type="button"
           onClick={() => onSelectFormat("GRUPOS_ELIMINATORIA")}
           className={`rounded-xl border-2 p-4 text-left transition-all ${
             selectedFormat === "GRUPOS_ELIMINATORIA" ? "border-sky-500 bg-sky-50" : "border-slate-200 hover:border-slate-400"
@@ -256,6 +259,7 @@ export function FixtureConfigurator({
       {message && <p className="text-sm mb-4 font-medium">{message}</p>}
 
       <button
+        type="button"
         onClick={onGenerate}
         disabled={!selectedFormat || isPending || teamCount < 2}
         className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
