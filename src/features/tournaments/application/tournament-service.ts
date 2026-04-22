@@ -508,12 +508,13 @@ export async function updateTournament(input: {
     throw new ServiceError(404, "Torneo no encontrado");
   }
 
+  const currentTournamentStatus = isTournamentStatus(currentTournament.status) ? currentTournament.status : "DRAFT";
   const currentStatus = deriveTournamentStatus({
     teamCount: teamCount ?? 0,
     matchCount: matchCount ?? 0,
     finishedMatchCount: finishedMatchCount ?? 0,
     format: currentTournament.format,
-    status: currentTournament.status,
+    status: currentTournamentStatus,
   });
 
   const updateData: Record<string, unknown> = {};
@@ -554,6 +555,7 @@ export async function updateTournament(input: {
 
   const discipline = data.Discipline as unknown as { id: string; name: string } | null;
   const category = data.Category as unknown as { id: string; name: string; gender: string } | null;
+  const updatedTournamentStatus = isTournamentStatus(data.status) ? data.status : "DRAFT";
   return {
     id: data.id,
     name: data.name,
@@ -563,7 +565,7 @@ export async function updateTournament(input: {
       matchCount: matchCount ?? 0,
       finishedMatchCount: finishedMatchCount ?? 0,
       format: data.format,
-      status: data.status,
+      status: updatedTournamentStatus,
     }),
     schedulingRules: schedulingRulesFromRow(data),
     discipline: { id: discipline?.id ?? "", name: discipline?.name ?? "" },
@@ -614,6 +616,7 @@ export async function addTeamToTournament(input: { tournamentId: string; teamId:
   }
 
   const { count: teamCount } = await supabase.from("TournamentTeam").select("id", { count: "exact", head: true }).eq("tournamentId", input.tournamentId);
+  const tournamentStatus = isTournamentStatus(tournament.status) ? tournament.status : "DRAFT";
 
   await supabase
     .from("Tournament")
@@ -622,7 +625,7 @@ export async function addTeamToTournament(input: { tournamentId: string; teamId:
         teamCount: teamCount ?? 0,
         matchCount: 0,
         format: tournament.format,
-        status: tournament.status,
+        status: tournamentStatus,
       }),
     })
     .eq("id", input.tournamentId);
@@ -651,6 +654,7 @@ export async function removeTeamFromTournament(input: { tournamentId: string; te
   }
 
   const { count: teamCount } = await supabase.from("TournamentTeam").select("id", { count: "exact", head: true }).eq("tournamentId", input.tournamentId);
+  const tournamentStatus = isTournamentStatus(tournament.status) ? tournament.status : "DRAFT";
 
   await supabase
     .from("Tournament")
@@ -659,7 +663,7 @@ export async function removeTeamFromTournament(input: { tournamentId: string; te
         teamCount: teamCount ?? 0,
         matchCount: 0,
         format: tournament.format,
-        status: tournament.status,
+        status: tournamentStatus,
       }),
     })
     .eq("id", input.tournamentId);

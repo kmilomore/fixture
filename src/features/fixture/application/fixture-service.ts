@@ -8,6 +8,7 @@ import {
 import { syncAutomaticFixtureAssignments } from "@/features/fixture/application/automatic-assignment-service";
 import {
   deriveTournamentStatus,
+  isTournamentStatus,
   schedulingRulesToRow,
 } from "@/features/tournaments/domain/tournament-lifecycle";
 import {
@@ -21,6 +22,18 @@ import { ServiceError } from "@/shared/lib/service-error";
 
 function isNonNegativeInteger(value: unknown) {
   return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function toMatchDateValue(value: Date | string | null | undefined) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null || typeof value === "string") {
+    return value;
+  }
+
+  return value.toISOString();
 }
 
 export async function setTournamentFormat(input: {
@@ -99,7 +112,7 @@ export async function generateFixture(input: { tournamentId: string; options: Fi
     round: match.round,
     groupName: match.groupName,
     matchLogicIdentifier: match.matchLogicIdentifier,
-    date: match.date ?? null,
+    date: toMatchDateValue(match.date) ?? null,
   }));
 
   const { error: insertError } = await supabase.from("Match").insert(matchInserts);
@@ -203,7 +216,7 @@ export async function updateMatchResult(input: {
   }
 
   if (input.date !== undefined) {
-    updateData.date = input.date === null ? null : input.date;
+    updateData.date = toMatchDateValue(input.date);
   }
 
   if (nextIncidentType !== undefined) {
@@ -232,6 +245,8 @@ export async function updateMatchResult(input: {
   ]);
 
   if (tournament) {
+    const normalizedStatus = isTournamentStatus(tournament.status) ? tournament.status : "DRAFT";
+
     await syncAutomaticFixtureAssignments({
       tournamentId: data.tournamentId,
       format: tournament.format as FixtureFormat | null,
@@ -246,7 +261,7 @@ export async function updateMatchResult(input: {
           matchCount: matchCount ?? 0,
           finishedMatchCount: finishedMatchCount ?? 0,
           format: tournament.format,
-          status: tournament.status,
+          status: normalizedStatus,
         }),
       })
       .eq("id", data.tournamentId);
