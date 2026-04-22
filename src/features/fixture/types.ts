@@ -1,6 +1,36 @@
 import type { MatchIncidentType, MatchStatus } from "@/features/fixture/domain/match-lifecycle";
-import type { FixtureSchedulingRules } from "@/features/fixture/domain/fixture-engine";
+import type { FixtureFormat, FixtureSchedulingRules } from "@/features/fixture/domain/fixture-engine";
 import type { TournamentStatus } from "@/features/tournaments/domain/tournament-lifecycle";
+
+export type FixtureFormatConfig = {
+  selected: FixtureFormat | null;
+  groupCount: number;
+  seededTeamIds: string[];
+};
+
+export type FixtureSchedulingConfig = {
+  startDate: string;
+  endDate: string;
+  matchesPerMatchday: number;
+  dailyStartTime: string;
+  dailyEndTime: string;
+  matchDurationMinutes: number;
+  allowedWeekdays: number[];
+};
+
+export type FixtureConfigHandlers = {
+  onSelectFormat: (format: FixtureFormat) => void;
+  onSetGroupCount: (value: number) => void;
+  onSetSeededTeamId: (groupIndex: number, teamId: string) => void;
+  onSetStartDate: (value: string) => void;
+  onSetEndDate: (value: string) => void;
+  onSetMatchesPerMatchday: (value: number) => void;
+  onSetDailyStartTime: (value: string) => void;
+  onSetDailyEndTime: (value: string) => void;
+  onSetMatchDurationMinutes: (value: number) => void;
+  onToggleWeekday: (day: number) => void;
+  onGenerate: () => void;
+};
 
 export type FixtureTeamView = {
   id: string;
