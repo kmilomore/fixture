@@ -56,7 +56,7 @@ export async function createDiscipline(input: { name: string }) {
   }
 
   const { data: existing } = await supabase.from("Discipline").select("name");
-  if ((existing ?? []).some((item) => normalizeCatalogName(item.name) === normalizeCatalogName(name))) {
+  if (((existing ?? []) as Array<{ name: string }>).some((item) => normalizeCatalogName(item.name) === normalizeCatalogName(name))) {
     throw new ServiceError(409, "La disciplina ya existe");
   }
 
@@ -166,7 +166,7 @@ export async function createCategory(input: { name: string; gender: string }) {
 
   const { data: existing } = await supabase.from("Category").select("name, gender");
   if (
-    (existing ?? []).some(
+    ((existing ?? []) as Array<{ name: string; gender: string }>).some(
       (item) =>
         normalizeCatalogName(item.name) === normalizeCatalogName(name) &&
         normalizeCatalogName(item.gender) === normalizeCatalogName(gender)
